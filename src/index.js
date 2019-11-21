@@ -3,15 +3,15 @@ import { EFSystem } from './EFSystem';
 /**
  * @param {PIXI.Renderer} renderer
  */
-export function injectHPPF(renderer)
+export function injectEF(renderer)
 {
     const hppf = new EFSystem(renderer);
 
-    renderer.runners.forEach((runner) =>
+    for (const i in renderer.runners)
     {
-        runner.remove(renderer.filter);
-        runner.add(hppf);
-    });
+        renderer.runners[i].remove(renderer.filter);
+        renderer.runners[i].add(hppf);
+    }
 
     renderer.filter = hppf;
 }

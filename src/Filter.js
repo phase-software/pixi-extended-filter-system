@@ -2,7 +2,6 @@ import { Filter as BaseFilter } from 'pixi.js';
 import defaultFragment from './defaultFilter.frag';
 
 /**
- *
  */
 export class Filter extends BaseFilter
 {
@@ -21,11 +20,27 @@ export class Filter extends BaseFilter
     measure(targetBounds, passBounds)
     {
         this._frame = passBounds;
+        this._renderable = true;
     }
 
+    /**
+     * Input frame required by this filter, as recorded by the last measure
+     * pass.
+     * @returns {PIXI.Rectangle}
+     */
     get frame()
     {
         return this._frame;
+    }
+
+    /**
+     * Whether this filter can be applied without reducing the refresh rate
+     * significantly
+     * @returns {boolean}
+     */
+    get renderable()
+    {
+        return this._renderable;
     }
 
     static get defaultVertexSrc()

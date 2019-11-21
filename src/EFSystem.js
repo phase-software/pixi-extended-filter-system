@@ -1,12 +1,15 @@
 import { systems, Rectangle, Point, DRAW_MODES } from 'pixi.js';
 
+const START = 0;
+const MEASURED = 1;
+
 /**
  * System plugin to the renderer to manage filter states.
  *
  * @class
  * @private
  */
-class FilterState
+class FilterPipe
 {
     constructor()
     {
@@ -16,7 +19,6 @@ class FilterState
          * Target of the filters
          * We store for case when custom filter wants to know the element it was applied on
          * @member {PIXI.DisplayObject}
-         * @private
          */
         this.target = null;
 
@@ -24,7 +26,6 @@ class FilterState
          * Compatibility with PixiJS v4 filters
          * @member {boolean}
          * @default false
-         * @private
          */
         this.legacy = false;
 
@@ -32,9 +33,14 @@ class FilterState
          * Resolution of filters
          * @member {number}
          * @default 1
-         * @private
          */
         this.resolution = 1;
+
+        /**
+         * Whether all filters can be rendered in reasonable time.
+         * @member {boolean}
+         */
+        this.renderable = true;
 
         /**
          * Frame of the target object's total filter area.
@@ -84,8 +90,8 @@ export class EFSystem extends systems.FilterSystem
     {
         super(renderer, ...args);
 
-        this.globalUniforms.inputFrameInverse = new Float32Array(2);
-        this.globalUniforms.outputFrameInverse = new Float32Array(2);
+        this.globalUniforms.uniforms.inputFrameInverse = new Float32Array(2);
+        this.globalUniforms.uniforms.outputFrameInverse = new Float32Array(2);
     }
 
     /**
@@ -95,25 +101,7 @@ export class EFSystem extends systems.FilterSystem
     {
         const renderer = this.renderer;
         const filterStack = this.defaultFilterStack;
-        const state = this.statePool.pop() || new FilterState();
-
-        let resolution = filters[0].resolution;
-
-        let padding = filters[0].padding;
-
-        let autoFit = filters[0].autoFit;
-
-        let legacy = filters[0].legacy;
-
-        for (let i = 1; i < filters.length; i++)
-        {
-            const filter =  filters[i];
-
-            resolution = Math.min(resolution, filter.resolution);
-            padding = Math.max(padding, filter.padding);
-            autoFit = autoFit || filter.autoFit;
-            legacy = legacy || filter.legacy;
-        }
+        const state = this._newPipe(target, filters);
 
         if (filterStack.length === 1)
         {
@@ -121,27 +109,10 @@ export class EFSystem extends systems.FilterSystem
         }
 
         filterStack.push(state);
-        state.resolution = resolution;
-        state.legacy = legacy;
-        state.target = target;
-        state.outputFrame.copyFrom(target.filterArea || target.getBounds(true));
-        state.outputFrame.pad(padding);
 
-        if (autoFit)
-        {
-            state.targetFrame = state.outputFrame.clone();
-            state.outputFrame.fit(this.renderer.renderTexture.outputFrame);
-        }
-        else
-        {
-            state.targetFrame = state.outputFrame;
-        }
+        this.measure(state);
 
-        this.measure(state);// measure input frame
-
-        state.outputFrame.ceil(resolution);
         state.renderTexture = this.filterPassRenderTextureFor(state);
-        state.filters = filters;
         state.textureDimensions.set(state.renderTexture.width, state.renderTexture.height);
 
         state.renderTexture.filterFrame = state.inputFrame;
@@ -220,6 +191,16 @@ export class EFSystem extends systems.FilterSystem
         this.statePool.push(state);
     }
 
+    get inputFrame()
+    {
+        return this.globalUniforms.uniforms.inputFrame;
+    }
+
+    get outputFrame()
+    {
+        return this.globalUniforms.uniforms.outputFrame;
+    }
+
     /** @override */
     applyFilter(filter, input, output, clear)
     {
@@ -254,10 +235,64 @@ export class EFSystem extends systems.FilterSystem
         }
     }
 
-    measure = (state) =>
+    /**
+     * Measures all the frames needed in the given pipe. This includes
+     * the target, input, output, and each filter's frame.
+     *
+     * NOTE: `measure` also calculates `resolution`, `padding`,
+     *  and `legacy` of the pipe.
+     *
+     * @param {FilterPipe} state
+     */
+    measure(state)
     {
-        const { filters, target, targetFrame, outputFrame } = state;
+        const { target, filters } = state;
 
+        let resolution = filters[0].resolution;
+
+        let padding = filters[0].padding;
+
+        let autoFit = filters[0].autoFit;
+
+        let legacy = filters[0].legacy;
+
+        let renderable = filters[0].renderable === undefined ? true : filters[0].renderable;
+
+        for (let i = 1; i < filters.length; i++)
+        {
+            const filter =  filters[i];
+
+            resolution = Math.min(resolution, filter.resolution);
+            padding = Math.max(padding, filter.padding);
+            autoFit = autoFit || filter.autoFit;
+            legacy = legacy || filter.legacy;
+            renderable = renderable && (filter.renderable !== undefined ? filter.renderable : true);
+        }
+
+        // target- & output- frame measuring pass
+        state.resolution = resolution;
+        state.legacy = legacy;
+        state.renderable = renderable;
+        state.target = target;
+        state.outputFrame.copyFrom(target.filterArea || target.getBounds(true));
+        state.outputFrame.pad(padding);
+
+        if (autoFit)
+        {
+            state.targetFrame = state.outputFrame.clone();
+            state.targetFrame.ceil(resolution);
+            state.outputFrame.fit(this.renderer.renderTexture.sourceFrame);
+        }
+        else
+        {
+            state.targetFrame = state.outputFrame;
+        }
+
+        state.outputFrame.ceil(resolution);
+
+        const { targetFrame, outputFrame } = state;
+
+        // per-filter frame measuring pass
         let filterPassFrame = outputFrame;
 
         for (let i = filters.length - 1; i >= 0; i--)
@@ -266,7 +301,7 @@ export class EFSystem extends systems.FilterSystem
 
             if (filter.measure)
             {
-                filter.measure(target, targetFrame, filterPassFrame);
+                filter.measure(targetFrame, filterPassFrame.clone());
                 filterPassFrame = filters[i].frame.fit(targetFrame);
             }
             else
@@ -278,7 +313,29 @@ export class EFSystem extends systems.FilterSystem
         state.inputFrame = filters[0].frame ? filters[0].frame : outputFrame;
     }
 
-    filterPassRenderTextureFor = (state) =>
+    /**
+     * Premeasure the frames needed by the filter system during a render pass.
+     *
+     * This is useful if you need measurements in a custom `render` method.
+     *
+     * @param {PIXI.DisplayObject} target
+     * @param {Array<PIXI.Filter>} filters
+     * @returns {FilterPipe} pipe with measurements
+     */
+    premeasure(target, filters)
+    {
+        const pipe = this._newPipe(target, filters);
+
+        this.measure(pipe);
+
+        return pipe;
+    }
+
+    /**
+     * @param {FilterPipe} state
+     * @returns {PIXI.RenderTexture}
+     */
+    filterPassRenderTextureFor(state)
     {
         let width = 0;
 
@@ -339,6 +396,19 @@ export class EFSystem extends systems.FilterSystem
             globalUniforms.filterClamp = globalUniforms.inputClamp;
         }
 
-        globalUniforms.update();
+        this.globalUniforms.update();
+    }
+
+    _newPipe(target, filters)
+    {
+        const pipe = this.statePool.pop() || new FilterPipe();
+
+        if (target)
+        {
+            pipe.target = target;
+            pipe.filters = filters ? filters : target.filters;
+        }
+
+        return pipe;
     }
 }
