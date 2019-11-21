@@ -1,5 +1,6 @@
 import { Filter as BaseFilter } from 'pixi.js';
 import defaultFragment from './defaultFilter.frag';
+import translateInputFragment from './translateInput.frag';
 
 /**
  */
@@ -16,8 +17,9 @@ export class Filter extends BaseFilter
      * in the pass-output. It should keep the results in `Filter#frame`
      * @param {PIXI.Rectangle} targetBounds - bounds of the target object
      * @param {PIXI.Rectangle} passBounds - frame in which output is required
+     * @param {number} padding - padding applied in the target bounds
      */
-    measure(targetBounds, passBounds)
+    measure(targetBounds, passBounds, padding)
     {
         this._frame = passBounds;
         this._renderable = true;
@@ -51,6 +53,11 @@ export class Filter extends BaseFilter
     static get defaultFragmentSrc()
     {
         return defaultFragment;
+    }
+
+    static get translateInputFragmentSrc()
+    {
+        return translateInputFragment;
     }
 }
 

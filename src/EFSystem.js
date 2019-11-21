@@ -1,10 +1,7 @@
 import { systems, Rectangle, Point, DRAW_MODES } from 'pixi.js';
 
-const START = 0;
-const MEASURED = 1;
-
 /**
- * System plugin to the renderer to manage filter states.
+ * Manages all the filters applied on an object in the display-object hierarchy.
  *
  * @class
  * @private
@@ -73,7 +70,25 @@ class FilterPipe
     }
 
     /**
-     * clears the state
+     * Legacy alias of `FilterPipe#inputFrame`.
+     * @returns {PIXI.Rectangle}
+     */
+    sourceFrame()
+    {
+        return this.inputFrame;
+    }
+
+    /**
+     * Legacy alias of `FilterPipe#textureDimensions`, in `PIXI.Rectangle` form.
+     * @returns {PIXI.Rectangle}
+     */
+    destinationFrame()
+    {
+        return new Rectangle(0, 0, this.textureDimensions.x, this.textureDimensions.y);
+    }
+
+    /**
+     * Clears the state
      * @private
      */
     clear()
@@ -112,12 +127,15 @@ export class EFSystem extends systems.FilterSystem
 
         this.measure(state);
 
-        state.renderTexture = this.filterPassRenderTextureFor(state);
-        state.textureDimensions.set(state.renderTexture.width, state.renderTexture.height);
+        if (state.filters.length > 0)
+        {
+            state.renderTexture = this.filterPassRenderTextureFor(state);
+            state.textureDimensions.set(state.renderTexture.width, state.renderTexture.height);
 
-        state.renderTexture.filterFrame = state.inputFrame;
-        renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
-        renderer.renderTexture.clear();
+            state.renderTexture.filterFrame = state.inputFrame;
+            renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
+            renderer.renderTexture.clear();
+        }
     }
 
     pop()
@@ -128,63 +146,66 @@ export class EFSystem extends systems.FilterSystem
 
         this.activeState = state;
 
-        const globalUniforms = this.globalUniforms.uniforms;
-        const { inputSize, inputPixel, inputClamp } = globalUniforms;
-
-        globalUniforms.resolution = state.resolution;
-
-        inputSize[0] = state.textureDimensions.x;
-        inputSize[1] = state.textureDimensions.y;
-        inputSize[2] = 1.0 / inputSize[0];
-        inputSize[3] = 1.0 / inputSize[1];
-
-        inputPixel[0] = inputSize[0] * state.resolution;
-        inputPixel[1] = inputSize[1] * state.resolution;
-        inputPixel[2] = 1.0 / inputPixel[0];
-        inputPixel[3] = 1.0 / inputPixel[1];
-
-        inputClamp[0] = 0.5 * inputPixel[2];
-        inputClamp[1] = 0.5 * inputPixel[3];
-
-        this.globalUniforms.update();
-
-        const lastState = filterStack[filterStack.length - 1];
-
-        if (filters.length === 1)
+        if (filters.length > 0)
         {
-            this.passUniforms(state, 0);
-            filters[0].apply(this, state.renderTexture, lastState.renderTexture, false, state);
+            const globalUniforms = this.globalUniforms.uniforms;
+            const { inputSize, inputPixel, inputClamp } = globalUniforms;
 
-            this.returnFilterTexture(state.renderTexture);
-        }
-        else
-        {
-            let flip = state.renderTexture;
+            globalUniforms.resolution = state.resolution;
 
-            let flop = this.getOptimalFilterTexture(
-                flip.width,
-                flip.height,
-                state.resolution,
-            );
+            inputSize[0] = state.textureDimensions.x;
+            inputSize[1] = state.textureDimensions.y;
+            inputSize[2] = 1.0 / inputSize[0];
+            inputSize[3] = 1.0 / inputSize[1];
 
-            let i = 0;
+            inputPixel[0] = inputSize[0] * state.resolution;
+            inputPixel[1] = inputSize[1] * state.resolution;
+            inputPixel[2] = 1.0 / inputPixel[0];
+            inputPixel[3] = 1.0 / inputPixel[1];
 
-            for (i = 0; i < filters.length - 1; ++i)
+            inputClamp[0] = 0.5 * inputPixel[2];
+            inputClamp[1] = 0.5 * inputPixel[3];
+
+            this.globalUniforms.update();
+
+            const lastState = filterStack[filterStack.length - 1];
+
+            if (filters.length === 1)
             {
-                this.passUniforms(state, i);
-                flop.filterFrame = state.filters[i + 1].frame ? state.filters[i + 1].frame : state.outputFrame;
-                filters[i].apply(this, flip, flop, true, state);
+                this.passUniforms(state, 0);
+                filters[0].apply(this, state.renderTexture, lastState.renderTexture, false, state);
 
-                const t = flip;
-
-                flip = flop;
-                flop = t;
+                this.returnFilterTexture(state.renderTexture);
             }
+            else
+            {
+                let flip = state.renderTexture;
 
-            filters[i].apply(this, flip, lastState.renderTexture, false, state);
+                let flop = this.getOptimalFilterTexture(
+                    flip.width,
+                    flip.height,
+                    state.resolution,
+                );
 
-            this.returnFilterTexture(flip);
-            this.returnFilterTexture(flop);
+                let i = 0;
+
+                for (i = 0; i < filters.length - 1; ++i)
+                {
+                    this.passUniforms(state, i);
+                    flop.filterFrame = state.filters[i + 1].frame ? state.filters[i + 1].frame : state.outputFrame;
+                    filters[i].apply(this, flip, flop, true, state);
+
+                    const t = flip;
+
+                    flip = flop;
+                    flop = t;
+                }
+
+                filters[i].apply(this, flip, lastState.renderTexture, false, state);
+
+                this.returnFilterTexture(flip);
+                this.returnFilterTexture(flop);
+            }
         }
 
         state.clear();
@@ -246,7 +267,7 @@ export class EFSystem extends systems.FilterSystem
      */
     measure(state)
     {
-        const { target, filters } = state;
+        let { target, filters } = state;
 
         let resolution = filters[0].resolution;
 
@@ -256,8 +277,6 @@ export class EFSystem extends systems.FilterSystem
 
         let legacy = filters[0].legacy;
 
-        let renderable = filters[0].renderable === undefined ? true : filters[0].renderable;
-
         for (let i = 1; i < filters.length; i++)
         {
             const filter =  filters[i];
@@ -266,13 +285,11 @@ export class EFSystem extends systems.FilterSystem
             padding = Math.max(padding, filter.padding);
             autoFit = autoFit || filter.autoFit;
             legacy = legacy || filter.legacy;
-            renderable = renderable && (filter.renderable !== undefined ? filter.renderable : true);
         }
 
         // target- & output- frame measuring pass
         state.resolution = resolution;
         state.legacy = legacy;
-        state.renderable = renderable;
         state.target = target;
         state.outputFrame.copyFrom(target.filterArea || target.getBounds(true));
         state.outputFrame.pad(padding);
@@ -295,14 +312,35 @@ export class EFSystem extends systems.FilterSystem
         // per-filter frame measuring pass
         let filterPassFrame = outputFrame;
 
+        let renderable = true;
+
+        // can we modify filters? (only after it is cloned)
+        let filtersMutable = false;
+
         for (let i = filters.length - 1; i >= 0; i--)
         {
             const filter = filters[i];
 
             if (filter.measure)
             {
-                filter.measure(targetFrame, filterPassFrame.clone());
+                filter.measure(targetFrame, filterPassFrame.clone(), padding);
                 filterPassFrame = filters[i].frame.fit(targetFrame);
+
+                if (filterPassFrame.width <= 0 || filterPassFrame.height <= 0)
+                {
+                    if (!filtersMutable)
+                    {
+                        filters = state.filters.slice();
+                        state.filters = filters;
+                        filtersMutable = true;
+                    }
+
+                    filters.splice(i, 1);
+                }
+                else
+                {
+                    renderable = renderable && filter.renderable;
+                }
             }
             else
             {
@@ -310,7 +348,10 @@ export class EFSystem extends systems.FilterSystem
             }
         }
 
-        state.inputFrame = filters[0].frame ? filters[0].frame : outputFrame;
+        state.renderable = renderable;
+
+        // filters may become empty if filters return empty rectangles as inputs.
+        state.inputFrame = filters[0] && filters[0].frame ? filters[0].frame : outputFrame;
     }
 
     /**
