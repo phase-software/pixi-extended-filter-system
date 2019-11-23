@@ -1,6 +1,8 @@
 import { Filter as BaseFilter } from 'pixi.js';
 import defaultFragment from './defaultFilter.frag';
+import translateInputVertex from './translateInput.vert';
 import translateInputFragment from './translateInput.frag';
+import acsVertex from './acs.vert';
 
 /**
  */
@@ -55,9 +57,19 @@ export class Filter extends BaseFilter
         return defaultFragment;
     }
 
+    static get translateInputVertexSrc()
+    {
+        return translateInputVertex;
+    }
+
     static get translateInputFragmentSrc()
     {
         return translateInputFragment;
+    }
+
+    static get acsVertexSrc()
+    {
+        return acsVertex;
     }
 }
 

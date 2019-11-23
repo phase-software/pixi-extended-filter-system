@@ -40,7 +40,7 @@ class FilterPipe
         this.renderable = true;
 
         /**
-         * Frame of the target object's total filter area.
+         * Frame of the target object's total filter area (including padding).
          * @member {PIXI.Rectangle}
          * @private
          */
@@ -73,7 +73,7 @@ class FilterPipe
      * Legacy alias of `FilterPipe#inputFrame`.
      * @returns {PIXI.Rectangle}
      */
-    sourceFrame()
+    get sourceFrame()
     {
         return this.inputFrame;
     }
@@ -82,9 +82,25 @@ class FilterPipe
      * Legacy alias of `FilterPipe#textureDimensions`, in `PIXI.Rectangle` form.
      * @returns {PIXI.Rectangle}
      */
-    destinationFrame()
+    get destinationFrame()
     {
         return new Rectangle(0, 0, this.textureDimensions.x, this.textureDimensions.y);
+    }
+
+    /**
+     * Bounds of the target, without the filter padding.
+     * @returns {PIXI.Rectangle}
+     */
+    get nakedTargetBounds()
+    {
+        if (this._nakedTargetBounds)
+        {
+            return this._nakedTargetBounds;
+        }
+
+        this._nakedTargetBounds = this.targetFrame.clone().pad(-this.padding);
+
+        return this._nakedTargetBounds;
     }
 
     /**
@@ -96,6 +112,7 @@ class FilterPipe
         this.target = null;
         this.filters = null;
         this.renderTexture = null;
+        this._nakedTargetBounds = null;
     }
 }
 
@@ -165,8 +182,6 @@ export class EFSystem extends systems.FilterSystem
 
             inputClamp[0] = 0.5 * inputPixel[2];
             inputClamp[1] = 0.5 * inputPixel[3];
-
-            this.globalUniforms.update();
 
             const lastState = filterStack[filterStack.length - 1];
 
@@ -291,6 +306,7 @@ export class EFSystem extends systems.FilterSystem
         state.resolution = resolution;
         state.legacy = legacy;
         state.target = target;
+        state.padding = padding;
         state.outputFrame.copyFrom(target.filterArea || target.getBounds(true));
         state.outputFrame.pad(padding);
 
@@ -324,9 +340,9 @@ export class EFSystem extends systems.FilterSystem
             if (filter.measure)
             {
                 filter.measure(targetFrame, filterPassFrame.clone(), padding);
-                filterPassFrame = filters[i].frame.fit(targetFrame);
+                const pfilterPassFrame = filters[i].frame.fit(targetFrame);
 
-                if (filterPassFrame.width <= 0 || filterPassFrame.height <= 0)
+                if (pfilterPassFrame.width <= 0 || pfilterPassFrame.height <= 0)
                 {
                     if (!filtersMutable)
                     {
@@ -340,6 +356,7 @@ export class EFSystem extends systems.FilterSystem
                 else
                 {
                     renderable = renderable && filter.renderable;
+                    filterPassFrame = pfilterPassFrame;
                 }
             }
             else
