@@ -26,5 +26,5 @@ void main(void)
 
     vec2 outTextureCoord = aVertexPosition * (outputFrame.zw * inputSize.zw);
     vTextureCoord = clamp(outTextureCoord - (inputFrame.xy - outputFrame.xy) * inputSize.zw,
-        vec2(0, 0), vec2((inputFrame.zw - vec2(0.5, 0.5)) * inputSize.zw));
+        vec2(0, 0), inputFrame.zw * inputSize.zw);
 }

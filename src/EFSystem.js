@@ -216,6 +216,7 @@ export class EFSystem extends systems.FilterSystem
                     flop = t;
                 }
 
+                this.passUniforms(state, filters.length - 1);
                 filters[i].apply(this, flip, lastState.renderTexture, false, state);
 
                 this.returnFilterTexture(flip);

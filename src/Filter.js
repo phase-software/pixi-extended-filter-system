@@ -5,11 +5,14 @@ import translateInputFragment from './translateInput.frag';
 import acsVertex from './acs.vert';
 
 /**
+ * Special type of shader that applies a 2D filter on pixel in an input and
+ * gives the required output. `Filter#measure` is used to determine the input
+ * needed by this filter, given an output that the system demands.
  */
 export class Filter extends BaseFilter
 {
     /** @override */
-    constructor(vertex, fragment = defaultFragment, uniforms)
+    constructor(vertex = translateInputVertex, fragment, uniforms)
     {
         super(vertex, fragment, uniforms);
     }
