@@ -10,6 +10,10 @@ class FilterPipe
 {
     constructor()
     {
+        /**
+         * The render-texture that is used as the output for the given filter. This may be
+         * changed after filter passes.
+         */
         this.renderTexture = null;
 
         /**
@@ -208,6 +212,7 @@ export class EFSystem extends systems.FilterSystem
                 {
                     this.passUniforms(state, i);
                     flop.filterFrame = state.filters[i + 1].frame ? state.filters[i + 1].frame : state.outputFrame;
+                    state.renderTexture = flop;
                     filters[i].apply(this, flip, flop, true, state);
 
                     const t = flip;
@@ -425,7 +430,7 @@ export class EFSystem extends systems.FilterSystem
     passUniforms(state, filterIndex)
     {
         const filter = state.filters[filterIndex];
-        const nextFilter = (filterIndex === state.filters.length - 1) ? null : state.filters[filterIndex];
+        const nextFilter = (filterIndex === state.filters.length - 1) ? null : state.filters[filterIndex + 1];
         const globalUniforms = this.globalUniforms.uniforms;
         const { inputSize, inputPixel, inputClamp, inputFrameInverse, outputFrameInverse } = globalUniforms;
         const inputFrame = filter.frame ? filter.frame : state.outputFrame;
@@ -469,5 +474,18 @@ export class EFSystem extends systems.FilterSystem
         }
 
         return pipe;
+    }
+
+    /** @override */
+    getFilterTexture(input, resolution)
+    {
+        if (input === undefined)
+        {
+            console.error('Warning: getFilterTexture without a reference texture '
+                + 'is deprecated. It defaults to a texture of the same size as output.');
+            console.error(new Error().stack);
+        }
+
+        return super.getFilterTexture(input, resolution);
     }
 }

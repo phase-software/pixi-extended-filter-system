@@ -15,16 +15,11 @@ vec4 filterVertexPosition( void )
     return vec4((projectionMatrix * vec3(position, 1.0)).xy, 0.0, 1.0);
 }
 
-vec2 filterTextureCoord( void )
-{
-    return aVertexPosition * (outputFrame.zw * inputSize.zw);
-}
-
 void main(void)
 {
     gl_Position = filterVertexPosition();
 
     vec2 outTextureCoord = aVertexPosition * (outputFrame.zw * inputSize.zw);
     vTextureCoord = clamp(outTextureCoord - (inputFrame.xy - outputFrame.xy) * inputSize.zw,
-        vec2(0, 0), inputFrame.zw * inputSize.zw);
+        vec2(.0, .0), inputFrame.zw * inputSize.zw);
 }

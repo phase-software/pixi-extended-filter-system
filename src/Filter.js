@@ -1,8 +1,7 @@
 import { Filter as BaseFilter } from 'pixi.js';
-import defaultFragment from './defaultFilter.frag';
-import translateInputVertex from './translateInput.vert';
-import translateInputFragment from './translateInput.frag';
+import defaultVertex from './defaultFilter.vert';
 import acsVertex from './acs.vert';
+import acsFragment from './acs.frag';
 
 /**
  * Special type of shader that applies a 2D filter on pixel in an input and
@@ -12,7 +11,7 @@ import acsVertex from './acs.vert';
 export class Filter extends BaseFilter
 {
     /** @override */
-    constructor(vertex = translateInputVertex, fragment, uniforms)
+    constructor(vertex = defaultVertex, fragment, uniforms)
     {
         super(vertex, fragment, uniforms);
     }
@@ -24,7 +23,7 @@ export class Filter extends BaseFilter
      * @param {PIXI.Rectangle} passBounds - frame in which output is required
      * @param {number} padding - padding applied in the target bounds
      */
-    measure(targetBounds, passBounds, padding)
+    measure(targetBounds, passBounds, padding)// eslint-disable-line no-unused-vars
     {
         this._frame = passBounds;
         this._renderable = true;
@@ -52,28 +51,25 @@ export class Filter extends BaseFilter
 
     static get defaultVertexSrc()
     {
-        return BaseFilter.defaultVertexSrc;
+        return defaultVertex;
     }
 
     static get defaultFragmentSrc()
     {
-        return defaultFragment;
-    }
-
-    static get translateInputVertexSrc()
-    {
-        return translateInputVertex;
-    }
-
-    static get translateInputFragmentSrc()
-    {
-        return translateInputFragment;
+        return BaseFilter.defaultFragmentSrc;
     }
 
     static get acsVertexSrc()
     {
         return acsVertex;
     }
+
+    static get acsFragmentSrc()
+    {
+        return acsFragment;
+    }
 }
+
+Filter.BaseFilter = BaseFilter;
 
 export default Filter;
