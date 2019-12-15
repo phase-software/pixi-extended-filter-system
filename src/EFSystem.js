@@ -1,7 +1,15 @@
-import { systems, Rectangle, Point, DRAW_MODES } from 'pixi.js';
+import { systems, Rectangle, Point, Geometry, DRAW_MODES } from 'pixi.js';
+import { Filter } from './Filter';
+
+const GEOMETRY_INDICES = [0, 1, 3, 2];
 
 /**
- * Manages all the filters applied on an object in the display-object hierarchy.
+ * Manages all the filters applied on an object in the display-object hierarchy. It
+ * is stateful and is used to communicate information to filter objects.
+ *
+ * NOTE: It is expected that filters do not modify read-only members. If they really
+ * need to, those members should be returned to their original state before returning
+ * to the filter-manager.
  *
  * @class
  * @private
@@ -11,20 +19,39 @@ class FilterPipe
     constructor()
     {
         /**
-         * The render-texture that is used as the output for the given filter. This may be
-         * changed after filter passes.
+         * The render-texture that was used to draw the object without filters. It
+         * need not contain the same data.
+         * @readonly
+         * @member {PIXI.RenderTexture}
          */
         this.renderTexture = null;
 
         /**
+         * Whether the filter is allowed to write on the input texture; this is `true`
+         * by default but filters can use this to communicate with nested filters.
+         * @member {boolean}
+         */
+        this.inputWritable = true;
+
+        /**
+         * Whether returning a texture different than the given output is allowed
+         * for the current filter pass. This can also be used by filters to communicate
+         * with nested filters.
+         * @member {boolean}
+         */
+        this.outputSwappable = false;
+
+        /**
          * Target of the filters
          * We store for case when custom filter wants to know the element it was applied on
+         * @readonly
          * @member {PIXI.DisplayObject}
          */
         this.target = null;
 
         /**
          * Compatibility with PixiJS v4 filters
+         * @readonly
          * @member {boolean}
          * @default false
          */
@@ -32,6 +59,7 @@ class FilterPipe
 
         /**
          * Resolution of filters
+         * @readonly
          * @member {number}
          * @default 1
          */
@@ -39,12 +67,14 @@ class FilterPipe
 
         /**
          * Whether all filters can be rendered in reasonable time.
+         * @readonly
          * @member {boolean}
          */
         this.renderable = true;
 
         /**
          * Frame of the target object's total filter area (including padding).
+         * @readonly
          * @member {PIXI.Rectangle}
          * @private
          */
@@ -53,6 +83,7 @@ class FilterPipe
         /**
          * Frame in which pixels are to be calculated for rendering onto the
          * final renderTexture/screen.
+         * @readonly
          * @member {PIXI.Rectangle}
          * @private
          */
@@ -60,6 +91,7 @@ class FilterPipe
 
         /**
          * Dimensions of the renderer texture on which the output pixels are stored.
+         * @readonly
          * @member {PIXI.Point}
          * @private
          */
@@ -67,6 +99,7 @@ class FilterPipe
 
         /**
          * Collection of filters
+         * @readonly
          * @member {PIXI.Filter[]}
          * @private
          */
@@ -92,7 +125,7 @@ class FilterPipe
     }
 
     /**
-     * Bounds of the target, without the filter padding.
+     * Bounds of the target, without the filter padding. Don't modify the returned object.
      * @returns {PIXI.Rectangle}
      */
     get nakedTargetBounds()
@@ -102,9 +135,27 @@ class FilterPipe
             return this._nakedTargetBounds;
         }
 
-        this._nakedTargetBounds = this.targetFrame.clone().pad(-this.padding);
+        this._nakedTargetBounds = this.target.getBounds(true);// don't update transform during a render pass
 
         return this._nakedTargetBounds;
+    }
+
+    /**
+     * The source frame, just without the padding applied; use this for clamping. It is
+     * the naked target bounds intersected with the screen. Don't modify the returned
+     * object.
+     * @returns {PIXI.Rectangle}
+     */
+    get nakedSourceFrame()
+    {
+        if (this._nakedSourceFrame)
+        {
+            return this._nakedSourceFrame;
+        }
+
+        this._nakedSourceFrame = this.nakedTargetBounds.clone().fit(this.outputFrame);
+
+        return this._nakedSourceFrame;
     }
 
     /**
@@ -117,6 +168,7 @@ class FilterPipe
         this.filters = null;
         this.renderTexture = null;
         this._nakedTargetBounds = null;
+        this._nakedSourceFrame = null;
     }
 }
 
@@ -128,6 +180,9 @@ export class EFSystem extends systems.FilterSystem
 
         this.globalUniforms.uniforms.inputFrameInverse = new Float32Array(2);
         this.globalUniforms.uniforms.outputFrameInverse = new Float32Array(2);
+        this.globalUniforms.uniforms.objectClamp = new Float32Array(4);
+
+        this.identityFilter = new Filter();
     }
 
     /**
@@ -153,7 +208,7 @@ export class EFSystem extends systems.FilterSystem
             state.renderTexture = this.filterPassRenderTextureFor(state);
             state.textureDimensions.set(state.renderTexture.width, state.renderTexture.height);
 
-            state.renderTexture.filterFrame = state.inputFrame;
+            state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
             renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
             renderer.renderTexture.clear();
         }
@@ -208,12 +263,28 @@ export class EFSystem extends systems.FilterSystem
 
                 let i = 0;
 
+                state.outputSwappable = true;
+                state.inputWritable = true;
+
                 for (i = 0; i < filters.length - 1; ++i)
                 {
                     this.passUniforms(state, i);
-                    flop.filterFrame = state.filters[i + 1].frame ? state.filters[i + 1].frame : state.outputFrame;
-                    state.renderTexture = flop;
-                    filters[i].apply(this, flip, flop, true, state);
+                    flop.filterFrame = this.outputFrame.clone().ceil(1);
+
+                    const output = filters[i].apply(this, flip, flop, true, state);
+
+                    if (output && output !== flop) // output is different from the given one
+                    {
+                        if (output !== flip) // output is different than the provided input
+                        {
+                            this.returnFilterTexture(flop);
+                            flop = output;
+                        }
+                        else
+                        {
+                            continue;// no need to flip-flop since input already was made the output
+                        }
+                    }
 
                     const t = flip;
 
@@ -222,6 +293,8 @@ export class EFSystem extends systems.FilterSystem
                 }
 
                 this.passUniforms(state, filters.length - 1);
+                state.outputSwappable = false;
+                state.inputWritable = true;
                 filters[i].apply(this, flip, lastState.renderTexture, false, state);
 
                 this.returnFilterTexture(flip);
@@ -244,7 +317,7 @@ export class EFSystem extends systems.FilterSystem
     }
 
     /** @override */
-    applyFilter(filter, input, output, clear)
+    applyFilter(filter, input, output, clear, options = {})
     {
         const renderer = this.renderer;
 
@@ -263,7 +336,12 @@ export class EFSystem extends systems.FilterSystem
         renderer.state.set(filter.state);
         renderer.shader.bind(filter);
 
-        if (filter.legacy)
+        if (options.geometry)
+        {
+            renderer.geometry.bind(options.geometry);
+            renderer.geometry.draw(options.drawMode ? options.drawMode : DRAW_MODES.TRIANGLE_STRIP);
+        }
+        else if (filter.legacy)
         {
             this.quadUv.map(input._frame, input.filterFrame);
 
@@ -292,20 +370,28 @@ export class EFSystem extends systems.FilterSystem
 
         let resolution = filters[0].resolution;
 
-        let padding = filters[0].padding;
-
         let autoFit = filters[0].autoFit;
 
         let legacy = filters[0].legacy;
+
+        let padding = filters[0].padding;
 
         for (let i = 1; i < filters.length; i++)
         {
             const filter =  filters[i];
 
             resolution = Math.min(resolution, filter.resolution);
-            padding = Math.max(padding, filter.padding);
-            autoFit = autoFit || filter.autoFit;
+            autoFit = autoFit && filter.autoFit;
             legacy = legacy || filter.legacy;
+
+            if (!filter.additivePadding)
+            {
+                padding = Math.max(padding, filter.padding);
+            }
+            else
+            {
+                padding += filter.padding;
+            }
         }
 
         // target- & output- frame measuring pass
@@ -362,13 +448,12 @@ export class EFSystem extends systems.FilterSystem
                 else
                 {
                     renderable = renderable && filter.renderable;
+                    pfilterPassFrame.ceil();
                     filterPassFrame = pfilterPassFrame;
                 }
             }
-            else
-            {
-                filterPassFrame = outputFrame;
-            }
+
+            // filterPassFrame is the same
         }
 
         state.renderable = renderable;
@@ -381,6 +466,8 @@ export class EFSystem extends systems.FilterSystem
      * Premeasure the frames needed by the filter system during a render pass.
      *
      * This is useful if you need measurements in a custom `render` method.
+     *
+     * TODO: Support caching measurements until flushing the filter pipe
      *
      * @param {PIXI.DisplayObject} target
      * @param {Array<PIXI.Filter>} filters
@@ -397,7 +484,7 @@ export class EFSystem extends systems.FilterSystem
 
     /**
      * @param {FilterPipe} state
-     * @returns {PIXI.RenderTexture}
+     * @returns {PIXI.RenderTexture} - render texture suitable for the given filter pipe
      */
     filterPassRenderTextureFor(state)
     {
@@ -424,20 +511,27 @@ export class EFSystem extends systems.FilterSystem
             }
         }
 
-        return this.getOptimalFilterTexture(width, height, state.resolution);
+        return this.getOptimalFilterTexture(Math.ceil(width), Math.ceil(height), state.resolution);
     }
 
     passUniforms(state, filterIndex)
     {
+        this._lastFilterIndex = filterIndex;
+
         const filter = state.filters[filterIndex];
         const nextFilter = (filterIndex === state.filters.length - 1) ? null : state.filters[filterIndex + 1];
         const globalUniforms = this.globalUniforms.uniforms;
-        const { inputSize, inputPixel, inputClamp, inputFrameInverse, outputFrameInverse } = globalUniforms;
-        const inputFrame = filter.frame ? filter.frame : state.outputFrame;
-        const outputFrame = (nextFilter && nextFilter.frame) ? nextFilter.frame : state.outputFrame;
+        const { inputSize, inputPixel, inputClamp, objectClamp, inputFrameInverse, outputFrameInverse } = globalUniforms;
+        const inputFrame = filter.frame;
+        const outputFrame = nextFilter ? nextFilter.frame : state.outputFrame;
 
         inputClamp[2] = (inputFrame.width * inputSize[2]) - (0.5 * inputPixel[2]);
         inputClamp[3] = (inputFrame.height * inputSize[3]) - (0.5 * inputPixel[3]);
+
+        objectClamp[0] = (Math.floor(state.nakedTargetBounds.left - inputFrame.left) + 0.5) * inputPixel[2];
+        objectClamp[1] = (Math.floor(state.nakedTargetBounds.top - inputFrame.top) + 0.5) * inputPixel[3];
+        objectClamp[2] = (Math.ceil(inputFrame.width - inputFrame.right + state.nakedTargetBounds.right) - 0.5) * inputPixel[2];
+        objectClamp[3] = (Math.ceil(inputFrame.height - inputFrame.bottom + state.nakedTargetBounds.bottom) - 0.5) * inputPixel[3];
 
         globalUniforms.inputFrame = inputFrame;
         globalUniforms.outputFrame = outputFrame;
@@ -448,7 +542,7 @@ export class EFSystem extends systems.FilterSystem
         outputFrameInverse[0] = 1 / outputFrame.width;
         outputFrameInverse[1] = 1 / outputFrame.height;
 
-        if (state.legacy)
+        //        if (state.legacy)
         {
             const filterArea = globalUniforms.filterArea;
 
@@ -461,6 +555,46 @@ export class EFSystem extends systems.FilterSystem
         }
 
         this.globalUniforms.update();
+    }
+
+    /**
+     * Converts the given frame into a geometry that the default vertex shader will
+     * draw. `frame` should fit inside `outputFrame`.
+     * @param {Rectangle} frame - the frame to draw
+     * @param {Rectangle}[outputFrame] - the output frame in which the filter operates. This
+     *      is what the texture being drawn to represents.
+     * @returns {Geometry} - the geometry to be used
+     */
+    convertFrameToGeometry(frame, outputFrame = this.outputFrame)
+    {
+        const u0 = (frame.x - outputFrame.x) / outputFrame.width;
+        const u1 = (frame.x - outputFrame.x + frame.width) / outputFrame.width;
+        const v0 = (frame.y - outputFrame.y) / outputFrame.height;
+        const v1 = (frame.y - outputFrame.y + frame.height) / outputFrame.height;
+        const geometry = this._newGeometry();
+
+        geometry.addAttribute('aVertexPosition', [
+            u0, v0,
+            u1, v0,
+            u1, v1,
+            u0, v1,
+        ]);
+
+        geometry.addIndex(GEOMETRY_INDICES);
+
+        return geometry;
+    }
+
+    convertFrameToClamp(frame, outputFrame = this.outputFrame, textureDimensions = this.activeState.textureDimensions)
+    {
+        const clamp = new Float32Array(4);
+
+        clamp[0] = (Math.floor(frame.x - outputFrame.x) + 0.5) / textureDimensions.x;
+        clamp[1] = (Math.floor(frame.y - outputFrame.y) + 0.5) / textureDimensions.y;
+        clamp[2] = (Math.ceil(frame.x + frame.width - outputFrame.x) - 0.5) / textureDimensions.x;
+        clamp[3] = (Math.ceil(frame.x + frame.height - outputFrame.x) - 0.5) / textureDimensions.y;
+
+        return clamp;
     }
 
     _newPipe(target, filters)
@@ -476,6 +610,11 @@ export class EFSystem extends systems.FilterSystem
         return pipe;
     }
 
+    _newGeometry()
+    {
+        return EFSystem.geometryPool.pop() || new Geometry();
+    }
+
     /** @override */
     getFilterTexture(input, resolution)
     {
@@ -489,3 +628,10 @@ export class EFSystem extends systems.FilterSystem
         return super.getFilterTexture(input, resolution);
     }
 }
+
+/**
+ * Pools of geometry objects for internal usage.
+ * @member {PIXI.Geometry[]}
+ * @private
+ */
+EFSystem.geometryPool = [];

@@ -1,4 +1,5 @@
 import { EFSystem } from './EFSystem';
+import { FilterPipe } from './FilterPipe';
 
 /**
  * @param {PIXI.Renderer} renderer
@@ -17,3 +18,4 @@ export function injectEF(renderer)
 }
 
 export { Filter, Filter as default } from './Filter';
+export { FilterPipe } from './FilterPipe';

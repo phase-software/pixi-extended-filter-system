@@ -14,6 +14,124 @@ export class Filter extends BaseFilter
     constructor(vertex = defaultVertex, fragment, uniforms)
     {
         super(vertex, fragment, uniforms);
+
+        this.additivePadding = false;
+
+        this.nestedFilters = [];
+
+        this.parentFilter = null;
+
+        this.padding = undefined;
+    }
+
+    /**
+     * @memberof PIXI.Filter
+     * @member {number}
+     * @name defaultPadding
+     * @abstract
+     *
+     * Create a defaultPadding property if your filter has an instrinsic need
+     * for one. The padding can be overridden by the client. The default padding
+     * should return the padding needed when viewport scale is 1 (it should not
+     * consider viewport in its calculation)
+     */
+
+    /**
+     * Keep the given filter as a nested filter. This will bind the padding
+     * & viewport properties of this filter to the nested filter.
+     *
+     * @param {PIXI.Filter} filter
+     * @param {boolean}[noBind=false] - prevents uniform binding from parent to child
+     * @returns {PIXI.Filter} the given filter
+     * @protected
+     */
+    keep(filter, noBind = false)
+    {
+        filter.parentFilter = this;
+        filter.viewport = this.viewport;
+        filter.uniforms.binding = noBind ? null : this.uniformGroup;
+
+        this.nestedFilters.push(filter);
+
+        return filter;
+    }
+
+    /**
+     * Remove the given filter from the nested filters.
+     * @param {PIXI.Filter} filter
+     * @protected
+     */
+    kick(filter)
+    {
+        const index = this.nestedFilters.indexOf(filter);
+
+        if (index > 0)
+        {
+            filter.uniforms.binding = null;
+            filter.parentFilter = null;
+            this.nestedFilters.splice(index, 1);
+        }
+    }
+
+    get padding()
+    {
+        let normalPadding;// padding when viewport scale is 1
+
+        if (this._paddingOverride !== undefined)
+        {
+            normalPadding = this._paddingOverride;
+        }
+        else if (this.defaultPadding !== undefined)
+        {
+            normalPadding = this.defaultPadding;
+        }
+        else
+        {
+            normalPadding = 0;
+        }
+
+        let padding = normalPadding * (this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1);
+
+        for (const filter of this.nestedFilters)
+        {
+            padding = Math.max(filter.padding, padding);
+        }
+
+        return Math.ceil(padding);
+    }
+    set padding(value)
+    {
+        this._paddingOverride = value;
+    }
+
+    get viewport()
+    {
+        return this._viewport;
+    }
+    set viewport(value)
+    {
+        this._viewport = value;
+
+        for (const filter of this.nestedFilters)
+        {
+            filter.viewport = value;
+        }
+    }
+
+    /**
+     * Overridable method called by `measure`. Use this to provide your custom measurements,
+     * by setting `this._frame` and `this._renderable`.
+     * @param {PIXI.Rectangle} targetBounds
+     * @param {PIXI.Rectangle} passBounds
+     * @param {number} padding
+     * @abstract
+     * @see {@link PIXI.Filter#frame}
+     * @see {@link PIXI.Filter#renderable}
+     */
+    onMeasure(targetBounds, passBounds, padding)// eslint-disable-line no-unused-vars
+    {
+        this._frame = passBounds;
+        this._renderable = true;
     }
 
     /**
@@ -23,10 +141,30 @@ export class Filter extends BaseFilter
      * @param {PIXI.Rectangle} passBounds - frame in which output is required
      * @param {number} padding - padding applied in the target bounds
      */
-    measure(targetBounds, passBounds, padding)// eslint-disable-line no-unused-vars
+    measure(targetBounds, passBounds, padding)
     {
-        this._frame = passBounds;
-        this._renderable = true;
+        this.onMeasure(targetBounds, passBounds, padding);
+
+        if (this.frame === null || this.frame === undefined)
+        {
+            throw new Error(`${this.constructor.name}#onMeasure does not set Filter#_frame.`);
+        }
+        if (this.renderable === undefined)
+        {
+            throw new Error(`${this.constructor.name}#onMeasure does not set Filter#_renderable.`);
+        }
+
+        for (const filter of this.nestedFilters)
+        {
+            filter.measure(targetBounds, passBounds, padding);
+            this._frame.enlarge(filter._frame);
+            this._renderable = this._renderable && filter._renderable;
+        }
+
+        for (const filter of this.nestedFilters)
+        {
+            filter._frame.copyFrom(this._frame);
+        }
     }
 
     /**
@@ -47,6 +185,16 @@ export class Filter extends BaseFilter
     get renderable()
     {
         return this._renderable;
+    }
+
+    get viewportScale()
+    {
+        return this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1;
+    }
+
+    apply(filterManager, input, output, clear, renderOptions)
+    {
+        filterManager.applyFilter(this, input, output, clear, renderOptions);
     }
 
     static get defaultVertexSrc()
