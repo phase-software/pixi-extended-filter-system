@@ -30,10 +30,21 @@ export class Filter extends BaseFilter
      * @name defaultPadding
      * @abstract
      *
-     * Create a defaultPadding property if your filter has an instrinsic need
+     * Create a <code>defaultPadding</code> property if your filter has an instrinsic need
      * for one. The padding can be overridden by the client. The default padding
      * should return the padding needed when viewport scale is 1 (it should not
      * consider viewport in its calculation)
+     */
+
+    /**
+     * @memberof PIXI.Filter
+     * @member {number}
+     * @name defaultResolution
+     * @abstract
+     *
+     * Create a <code>defaultResolution</code> property if your filter recommends a
+     * specific resolution. This should be 1, 2, or 4, but not more since higher resolutions
+     * need more memory.
      */
 
     /**

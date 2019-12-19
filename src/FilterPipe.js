@@ -172,6 +172,7 @@ export class FilterPipe
             nextTexture, true, this.state, renderOptions);
 
         this.filterManager.inputFrame.copyFrom(nextFrame);// it is not next anymore :)
+        this.filterManager.globalUniforms.update();
 
         // take care of the input bridge texture
         if (this.saveTexture)
@@ -214,22 +215,40 @@ export class FilterPipe
      * the one specified by the filter-manager.
      * @param {PIXI.Filter} filter
      * @param {object} renderOptions - render-options to pass to the filter.
+     * @param {boolean}[noFinalize=false] - (experimental) don't finalize this pipe; use this
+     *      when going to reset pipe to create another cycle.
      * @returns {PIXI.RenderTexture} - the closing texture, i.e. the texture that contains
-     *  the output. This must be returned to the filter-manager by the filter's `apply` method.
+     * the output. This must be returned to the filter-manager by the filter's `apply` method.
      */
-    closeWith(filter, renderOptions)
+    closeWith(filter, renderOptions, noFinalize = false)
     {
         this.state.inputWritable = true;
 
         this.filterManager.outputFrame.copyFrom(this.endFrame);
         this.autoRun();
-        filter.apply(this.filterManager, this.bridgeTexture, this.closingTexture, this.clear, this.state, renderOptions);
+        this.filterManager.globalUniforms.update();
+
+        const closingTextureOverride = filter.apply(this.filterManager, this.bridgeTexture, this.closingTexture,
+            this.clear, this.state, renderOptions);
+
+        if (closingTextureOverride)
+        {
+            this.overrideClosingTexture(closingTextureOverride);
+        }
 
         const closingTexture = this.closingTexture;
 
-        this.finalize();
+        if (!noFinalize)
+        {
+            this.finalize();
+        }
 
         return closingTexture;
+    }
+
+    reset()
+    {
+
     }
 
     /**
@@ -258,14 +277,15 @@ export class FilterPipe
         }
 
         const { filterManager } = this;
+        const { uniforms } = filterManager.globalUniforms;
 
         if (this.auto.objectClamp && this.auto.objectClamp !== 0)
         {
-            filterManager.globalUniforms.objectClamp = filterManager.convertFrameToClamp(this.auto.objectClamp);
+            uniforms.objectClamp = filterManager.convertFrameToClamp(this.auto.objectClamp);
         }
         else if (this.auto.objectClamp === 0)
         {
-            filterManager.globalUniforms.objectClamp = filterManager.convertFrameToClamp(this.state.nakedTargetBounds);
+            uniforms.objectClamp = filterManager.convertFrameToClamp(this.state.nakedTargetBounds);
             this.auto.objectClamp = undefined;
         }
     }
@@ -370,13 +390,31 @@ export class FilterPipe
         if (this.state.outputSwappable)
         {
             this._closingTexture = this.getBridgeTexture(this.state.outputFrame);
+
+            return this._closingTexture;
         }
 
         this._closingTexture = this.output;
 
         return this._closingTexture;
     }
+
+    /**
+     * @private
+     * @param {PIXI.Texture} tex
+     */
+    overrideClosingTexture(tex)
+    {
+        this._closingTexture = tex;
+    }
 }
+
+/**
+ * A singleton instance of `FilterPipe`, which is reusable.
+ * @static
+ * @member {PIXI.FilterPipe}
+ */
+FilterPipe.instance = new FilterPipe();
 
 /**
  * @callback PIXI.FilterPipe~useCallback

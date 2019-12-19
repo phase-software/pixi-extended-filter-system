@@ -169,6 +169,8 @@ class FilterPipe
         this.renderTexture = null;
         this._nakedTargetBounds = null;
         this._nakedSourceFrame = null;
+
+        this.textureDimensions.set();
     }
 }
 
