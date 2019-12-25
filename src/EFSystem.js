@@ -90,12 +90,20 @@ class FilterPipe
         this.outputFrame = new Rectangle();
 
         /**
-         * Dimensions of the renderer texture on which the output pixels are stored.
+         * Dimensions of the render-texture that will be mapped onto the screen.
          * @readonly
          * @member {PIXI.Point}
          * @private
          */
         this.textureDimensions = new Point();
+
+        /**
+         * Dimensions of the render texture multiplied by the resolution. These are
+         * actual number of pixels in the render-texture. If the resolution is greater
+         * than 1, then the render-texture will be downscaled before rendering to the
+         * screen.
+         */
+        this.texturePixels = new Point();
 
         /**
          * Collection of filters
@@ -167,6 +175,7 @@ class FilterPipe
         this.target = null;
         this.filters = null;
         this.renderTexture = null;
+        this.resolution = 0;
         this._nakedTargetBounds = null;
         this._nakedSourceFrame = null;
 
@@ -190,7 +199,7 @@ export class EFSystem extends systems.FilterSystem
     /**
      * @override
      */
-    push(target, filters)
+    push(target, filters, resolution = target.filterResolution ? target.filterResolution : 0)
     {
         const renderer = this.renderer;
         const filterStack = this.defaultFilterStack;
@@ -204,6 +213,11 @@ export class EFSystem extends systems.FilterSystem
         filterStack.push(state);
 
         this.measure(state);
+
+        if (resolution > 0)
+        {
+            state.resolution = resolution;
+        }
 
         if (state.filters.length > 0)
         {
@@ -318,6 +332,11 @@ export class EFSystem extends systems.FilterSystem
         return this.globalUniforms.uniforms.outputFrame;
     }
 
+    normalizePoint(value, into = value, texturePixels = this.activeState.texturePixels)
+    {
+        into.set(value.x / texturePixels.x, value.y / texturePixels.y);
+    }
+
     /** @override */
     applyFilter(filter, input, output, clear, options = {})
     {
@@ -415,7 +434,7 @@ export class EFSystem extends systems.FilterSystem
             state.targetFrame = state.outputFrame;
         }
 
-        state.outputFrame.ceil(resolution);
+        state.outputFrame.ceil();
 
         const { targetFrame, outputFrame } = state;
 

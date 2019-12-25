@@ -248,7 +248,7 @@ export class FilterPipe
 
     reset()
     {
-
+        // TODO: Finish this!
     }
 
     /**
