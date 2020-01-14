@@ -101,7 +101,7 @@ export class Filter extends BaseFilter
             normalPadding = 0;
         }
 
-        let padding = normalPadding * (this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1);
+        let padding = normalPadding * this.viewportScale;
 
         for (const filter of this.nestedFilters)
         {

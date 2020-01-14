@@ -20,6 +20,6 @@ void main(void)
     gl_Position = filterVertexPosition();
 
     vec2 outTextureCoord = aVertexPosition * (outputFrame.zw * inputSize.zw);
-    vTextureCoord = clamp(outTextureCoord - (inputFrame.xy - outputFrame.xy) * inputSize.zw,
+    vTextureCoord = clamp(outTextureCoord + (outputFrame.xy - inputFrame.xy) * inputSize.zw,
         vec2(.0, .0), inputFrame.zw * inputSize.zw);
 }

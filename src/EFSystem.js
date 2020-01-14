@@ -453,7 +453,7 @@ export class EFSystem extends systems.FilterSystem
             if (filter.measure)
             {
                 filter.measure(targetFrame, filterPassFrame.clone(), padding);
-                const pfilterPassFrame = filters[i].frame.fit(targetFrame);
+                const pfilterPassFrame = filters[i].frame;// .fit(targetFrame);
 
                 if (pfilterPassFrame.width <= 0 || pfilterPassFrame.height <= 0)
                 {

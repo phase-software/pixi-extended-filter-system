@@ -159,9 +159,11 @@ export class FilterPipe
      * @param {object} renderOptions - render-options to pass to the filter
      * @returns {PIXI.FilterPipe} - `this`
      */
-    bridge(filter, nextFrame = this.filterManager.inputFrame, renderOptions)
+    bridge(filter, nextFrame = this.bridgedFrame, renderOptions)
     {
-        this.state.inputWritable = !this.saveTexture;
+        const inputWritableHere = this.inputWritable || this.bridgeTexture !== this.input;
+
+        this.state.inputWritable = !this.saveTexture && inputWritableHere;
 
         const nextTexture = this.getBridgeTexture(nextFrame);
 
@@ -180,7 +182,7 @@ export class FilterPipe
             this._savedTextures.push(this.bridgeTexture);
             this.saveTexture = false;
         }
-        else if (nextOverride !== this.bridgeTexture)
+        else if (nextOverride !== this.bridgeTexture && inputWritableHere)
         {
             this.returnBridgeTexture(this.bridgeTexture);
         }
@@ -189,11 +191,16 @@ export class FilterPipe
         if (nextOverride)
         {
             this.bridgeTexture = nextOverride;
+
+            if (nextOverride !== nextTexture)
+            { this.returnBridgeTexture(nextTexture); }
         }
         else
         {
             this.bridgeTexture = nextTexture;
         }
+
+        this.bridgedFrame = nextFrame.clone();
 
         return this;
     }
@@ -222,7 +229,7 @@ export class FilterPipe
      */
     closeWith(filter, renderOptions, noFinalize = false)
     {
-        this.state.inputWritable = true;
+        this.state.inputWritable = !this.saveTexture && this.inputWritable ? true : this.bridgeTexture !== this.input;
 
         this.filterManager.outputFrame.copyFrom(this.endFrame);
         this.autoRun();
@@ -230,6 +237,12 @@ export class FilterPipe
 
         const closingTextureOverride = filter.apply(this.filterManager, this.bridgeTexture, this.closingTexture,
             this.clear, this.state, renderOptions);
+
+        if (this.saveTexture)
+        {
+            this._savedTextures.push(this.bridgeTexture);
+            this.saveTexture = false;
+        }
 
         if (closingTextureOverride)
         {
@@ -288,6 +301,8 @@ export class FilterPipe
             uniforms.objectClamp = filterManager.convertFrameToClamp(this.state.nakedTargetBounds);
             this.auto.objectClamp = undefined;
         }
+
+        filterManager.globalUniforms.update();
     }
 
     /**
@@ -350,12 +365,16 @@ export class FilterPipe
      */
     getBridgeTexture(frame)
     {
+        let bridgeTexture;
+
         if (this._bridgeTextures.length > 0)
         {
-            return this._bridgeTextures.pop();
+            bridgeTexture = this._bridgeTextures.pop();
         }
-
-        const bridgeTexture = this.filterManager.getFilterTexture(this.input);
+        else
+        {
+            bridgeTexture = this.filterManager.getFilterTexture(this.input);
+        }
 
         bridgeTexture.filterFrame = frame;// this will be set when used!
 
@@ -389,7 +408,7 @@ export class FilterPipe
 
         if (this.state.outputSwappable)
         {
-            this._closingTexture = this.getBridgeTexture(this.state.outputFrame);
+            this._closingTexture = this.getBridgeTexture(this.endFrame);
 
             return this._closingTexture;
         }
