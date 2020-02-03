@@ -54,4 +54,18 @@ export class CompositeFilter extends Filter
             this.nestedFilters.splice(index, 1);
         }
     }
+
+    get viewport()
+    {
+        return this._viewport;
+    }
+    set viewport(value)
+    {
+        this._viewport = value;
+
+        for (const filter of this.nestedFilters)
+        {
+            filter.viewport = value;
+        }
+    }
 }

@@ -85,20 +85,6 @@ export class Filter extends BaseFilter
         this._paddingOverride = value;
     }
 
-    get viewport()
-    {
-        return this._viewport;
-    }
-    set viewport(value)
-    {
-        this._viewport = value;
-
-        for (const filter of this.nestedFilters)
-        {
-            filter.viewport = value;
-        }
-    }
-
     /**
      * Overridable method called by `measure`. Use this to provide your custom measurements,
      * by setting `this._frame` and `this._renderable`.

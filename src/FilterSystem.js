@@ -297,7 +297,7 @@ export class FilterSystem extends systems.FilterSystem
             {
                 filter.viewport = state.viewport;
                 filter.measure(targetFrame, filterPassFrame.clone(), padding);
-                const pfilterPassFrame = filters[i].frame;// .fit(targetFrame);
+                const pfilterPassFrame = filters[i].frame.fit(targetFrame);
 
                 if (pfilterPassFrame.width <= 0 || pfilterPassFrame.height <= 0)
                 {
@@ -382,6 +382,35 @@ export class FilterSystem extends systems.FilterSystem
         }
 
         return this.getOptimalFilterTexture(Math.ceil(width), Math.ceil(height), state.resolution);
+    }
+
+    updateUniforms(filterPass)
+    {
+        const globalUniforms = this.globalUniforms.uniforms;
+
+        globalUniforms.inputFrame = filterPass.inputFrame;
+        //    globalUniforms.targetInFrame = filterPass.targetInFrame;
+        globalUniforms.outputFrame = filterPass.outputFrame;
+        //  globalUniforms.targetOutFrame = filterPass.targetOutFrame;
+
+        this.globalUniforms.update();
+    }
+
+    updateTextureUniforms(texture)
+    {
+        const { inputSize, inputPixel } = this.globalUniforms.uniforms;
+
+        inputSize[0] = texture.width;
+        inputSize[1] = texture.height;
+        inputSize[2] = 1.0 / inputSize[0];
+        inputSize[3] = 1.0 / inputSize[1];
+
+        inputPixel[0] = inputSize[0] * texture.resolution;
+        inputPixel[1] = inputSize[1] * texture.resolution;
+        inputPixel[2] = 1.0 / inputPixel[0];
+        inputPixel[3] = 1.0 / inputPixel[1];
+
+        this.globalUniforms.update();
     }
 
     passUniforms(state, filterIndex)
