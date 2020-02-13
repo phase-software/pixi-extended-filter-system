@@ -2,6 +2,7 @@ import { systems, Geometry, DRAW_MODES } from 'pixi.js';
 import { Filter } from './Filter';
 import { FilterScope as FilterPipe } from './FilterScope';
 import FilterRects from './FilterRects';
+import { RescaleFilter } from './filter-rescale';
 
 const GEOMETRY_INDICES = [0, 1, 3, 2];
 
@@ -26,6 +27,7 @@ export class FilterSystem extends systems.FilterSystem
         this.globalUniforms.uniforms.objectClamp = new Float32Array(4);
 
         this.identityFilter = new Filter();
+        this.rescaleFilter = new RescaleFilter();
     }
 
     /**

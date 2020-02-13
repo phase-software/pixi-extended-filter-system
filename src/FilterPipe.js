@@ -1,3 +1,5 @@
+import { SCALE_MODES } from 'pixi.js';
+
 /**
  * @namespace PIXI
  *
@@ -355,6 +357,16 @@ export class FilterPipe
 
         this.auto = {};
         this.autoMode = false;
+        this.bridgeTextureOptions = null;
+    }
+
+    get bridgeTextureOptions()
+    {
+        return this._bridgeTextureOptions;
+    }
+    set bridgeTextureOptions(value)
+    {
+        this._bridgeTextureOptions = value;
     }
 
     /**
@@ -377,6 +389,11 @@ export class FilterPipe
         }
 
         bridgeTexture.filterFrame = frame;// this will be set when used!
+
+        if (this.bridgeTextureOptions)
+        {
+            bridgeTexture.scaleMode = this.bridgeTextureOptions.scaleMode || SCALE_MODES.LINEAR;
+        }
 
         return bridgeTexture;
     }
