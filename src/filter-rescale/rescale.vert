@@ -1,3 +1,5 @@
+#define SHADER_NAME_ RescaleFilter
+
 attribute vec2 aVertexPosition;
 
 uniform mat3 projectionMatrix;

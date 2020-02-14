@@ -392,7 +392,11 @@ export class FilterPipe
 
         if (this.bridgeTextureOptions)
         {
-            bridgeTexture.scaleMode = this.bridgeTextureOptions.scaleMode || SCALE_MODES.LINEAR;
+            bridgeTexture.scaleMode = this.bridgeTextureOptions.scaleMode;
+            if (bridgeTexture.scaleMode === undefined)
+            {
+                bridgeTexture.scaleMode = SCALE_MODES.LINEAR;
+            }
         }
 
         return bridgeTexture;
