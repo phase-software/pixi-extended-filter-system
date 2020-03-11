@@ -1,4 +1,4 @@
-import { systems, Geometry, DRAW_MODES } from 'pixi.js';
+import { systems, Geometry, DRAW_MODES, Rectangle } from 'pixi.js';
 import { Filter } from './Filter';
 import { FilterScope as FilterPipe } from './FilterScope';
 import FilterRects from './FilterRects';
@@ -71,7 +71,7 @@ export class FilterSystem extends systems.FilterSystem
             state.texturePixels.copyFrom(state.textureDimensions);
 
             state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
-            renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
+            renderer.renderTexture.bind(state.renderTexture, state.inputFrame); // new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
             renderer.renderTexture.clear();
 
             const limit = renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE);
@@ -190,7 +190,7 @@ export class FilterSystem extends systems.FilterSystem
     {
         const renderer = this.renderer;
 
-        renderer.renderTexture.bind(output, output ? output.filterFrame : null);
+        renderer.renderTexture.bind(output, output ? output.filterFrame : null, options.destinationFrame);
 
         if (clear)
         {
@@ -202,7 +202,7 @@ export class FilterSystem extends systems.FilterSystem
         filter.uniforms.uSampler = input;
         filter.uniforms.filterGlobals = this.globalUniforms;
 
-        renderer.state.set(filter.state);
+        renderer.state.set(options.state ? options.state : filter.state);
         renderer.shader.bind(filter);
 
         if (options.geometry)
@@ -468,7 +468,7 @@ export class FilterSystem extends systems.FilterSystem
 
         if (clone.frame === FilterRects.NAKED_TARGET)
         {
-            clone.frame = state.nakedTargetBounds.clone();
+            clone.frame = state.nakedTargetBounds.clone().fit(this.inputFrame);
         }
         else if (clone.frame === FilterRects.WHOLE_INPUT)
         {

@@ -1,3 +1,5 @@
+import { Rectangle } from 'pixi.js';
+
 /**
  * Data object to store relevant filter frames for a filter.
  *
@@ -8,12 +10,14 @@
 export class FilterPass
 {
     constructor(inputFrame = null, targetInFrame = null,
-        outputFrame = null, targetOutFrame = null)
+        outputFrame = null, targetOutFrame = null, destinationFrame)
     {
         this.inputFrame = inputFrame;
         this.targetInFrame = targetInFrame;
         this.outputFrame = outputFrame;
         this.targetOutFrame = targetOutFrame;
+
+        this.destinationFrame = destinationFrame;
     }
 
     reset()
@@ -42,5 +46,7 @@ export class FilterPass
          * @member {PIXI.Rectangle}
          */
         this.targetOutFrame = null;
+
+        this.destinationFrame = null;
     }
 }

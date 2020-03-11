@@ -27,5 +27,6 @@ export class RescaleFilter extends Filter
         input.baseTexture.update();
         super.apply(filterManager, input, output, clear, state);
         input.baseTexture.scaleMode = sm;
+        input.baseTexture.update();
     }
 }
