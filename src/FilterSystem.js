@@ -1,4 +1,4 @@
-import { systems, Geometry, DRAW_MODES, Rectangle } from 'pixi.js';
+import { systems, Geometry, DRAW_MODES } from 'pixi.js';
 import { Filter } from './Filter';
 import { FilterScope as FilterPipe } from './FilterScope';
 import FilterRects from './FilterRects';
@@ -71,7 +71,14 @@ export class FilterSystem extends systems.FilterSystem
             state.texturePixels.copyFrom(state.textureDimensions);
 
             state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
-            renderer.renderTexture.bind(state.renderTexture, state.inputFrame); // new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
+
+            if (renderer.renderTexture.current)
+            {
+                renderer.renderTexture.current.filterFrame = renderer.renderTexture.sourceFrame.clone();
+            }
+
+            renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
+            // new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
             renderer.renderTexture.clear();
 
             const limit = renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE);
@@ -164,6 +171,7 @@ export class FilterSystem extends systems.FilterSystem
                 this.passUniforms(state, filters.length - 1);
                 state.outputSwappable = false;
                 state.inputWritable = true;
+
                 filters[i].apply(this, flip, lastState.renderTexture, false, state);
 
                 this.returnFilterTexture(flip);
@@ -190,13 +198,22 @@ export class FilterSystem extends systems.FilterSystem
     {
         const renderer = this.renderer;
 
-        renderer.renderTexture.bind(output, output ? output.filterFrame : null, options.destinationFrame);
+        renderer.renderTexture.bind(output,
+            output ? output.filterFrame : null, options.destinationFrame || output.destinationFrame);
 
-        if (clear)
+        if (clear && options.destinationFrame)
         {
-            // gl.disable(gl.SCISSOR_TEST);
+            const gl = this.renderer.gl;
+            const { x, y, width, height } = options.destinationFrame;
+
+            gl.enable(gl.SCISSOR_TEST);
+            gl.scissor(x, y, width, height);
             renderer.renderTexture.clear();
-            // gl.enable(gl.SCISSOR_TEST);
+            renderer.scissor.pop();
+        }
+        else if (clear)
+        {
+            renderer.renderTexture.clear();
         }
 
         filter.uniforms.uSampler = input;
