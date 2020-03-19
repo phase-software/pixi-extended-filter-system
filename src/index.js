@@ -1,6 +1,10 @@
 import { FilterSystem } from './FilterSystem';
 
 /**
+ * @namespace PHX
+ */
+
+/**
  * @param {PIXI.Renderer} renderer
  */
 export function injectEF(renderer)

@@ -1,8 +1,9 @@
-import { systems, Geometry, DRAW_MODES } from 'pixi.js';
+import { systems, Geometry, DRAW_MODES, Rectangle } from 'pixi.js';
 import { Filter } from './Filter';
 import { FilterScope as FilterPipe } from './FilterScope';
 import FilterRects from './FilterRects';
 import { RescaleFilter } from './filter-rescale';
+import { FilterPass } from './FilterPass';
 
 const GEOMETRY_INDICES = [0, 1, 3, 2];
 
@@ -15,6 +16,9 @@ const GEOMETRY_INDICES = [0, 1, 3, 2];
  * 3. Composite filters
  * 4. Object clamp
  * 5. Custom "push" options
+ *
+ * @class
+ * @extends PIXI.FilterSystem
  */
 export class FilterSystem extends systems.FilterSystem
 {
@@ -25,6 +29,8 @@ export class FilterSystem extends systems.FilterSystem
         this.globalUniforms.uniforms.inputFrameInverse = new Float32Array(2);
         this.globalUniforms.uniforms.outputFrameInverse = new Float32Array(2);
         this.globalUniforms.uniforms.objectClamp = new Float32Array(4);
+
+        this.globalUniforms.uniforms.inputFrame = new Rectangle();
 
         this.identityFilter = new Filter();
         this.rescaleFilter = new RescaleFilter();
@@ -44,6 +50,11 @@ export class FilterSystem extends systems.FilterSystem
         if (filterStack.length === 1)
         {
             this.defaultFilterStack[0].renderTexture = renderer.renderTexture.current;
+
+            if (this.renderer.renderTexture.current)
+            {
+                this.renderer.renderTexture.current.filterFrame = this.renderer.renderTexture.sourceFrame.clone();
+            }
         }
 
         filterStack.push(state);
@@ -72,13 +83,8 @@ export class FilterSystem extends systems.FilterSystem
 
             state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
 
-            if (renderer.renderTexture.current)
-            {
-                renderer.renderTexture.current.filterFrame = renderer.renderTexture.sourceFrame.clone();
-            }
-
-            renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
-            // new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
+            renderer.renderTexture.bind(state.renderTexture, state.inputFrame,
+                new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
             renderer.renderTexture.clear();
 
             const limit = renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE);
@@ -97,6 +103,8 @@ export class FilterSystem extends systems.FilterSystem
         const filters = state.filters;
 
         this.activeState = state;
+
+        state.currentIndex = 0;
 
         if (filters.length > 0)
         {
@@ -166,6 +174,8 @@ export class FilterSystem extends systems.FilterSystem
 
                     flip = flop;
                     flop = t;
+
+                    ++state.currentIndex;
                 }
 
                 this.passUniforms(state, filters.length - 1);
@@ -199,7 +209,7 @@ export class FilterSystem extends systems.FilterSystem
         const renderer = this.renderer;
 
         renderer.renderTexture.bind(output,
-            output ? output.filterFrame : null, options.destinationFrame || output.destinationFrame);
+            output ? output.filterFrame : null, options.destinationFrame || (output && output.destinationFrame));
 
         if (clear && options.destinationFrame)
         {
@@ -208,7 +218,7 @@ export class FilterSystem extends systems.FilterSystem
 
             gl.enable(gl.SCISSOR_TEST);
             gl.scissor(x, y, width, height);
-            renderer.renderTexture.clear();
+            renderer.renderTexture.clear([Math.random(), Math.random(), Math.random(), 1]);
             renderer.scissor.pop();
         }
         else if (clear)
@@ -248,7 +258,7 @@ export class FilterSystem extends systems.FilterSystem
      * NOTE: `measure` also calculates `resolution`, `padding`,
      *  and `legacy` of the pipe.
      *
-     * @param {FilterPipe} state
+     * @param {FilterScope} state
      */
     measure(state)
     {
@@ -289,6 +299,8 @@ export class FilterSystem extends systems.FilterSystem
         state.outputFrame.copyFrom(target.filterArea || target.getBounds(true));
         state.outputFrame.pad(padding);
 
+        state.filterPasses.length = 0;
+
         if (autoFit)
         {
             state.targetFrame = state.outputFrame.clone();
@@ -302,7 +314,7 @@ export class FilterSystem extends systems.FilterSystem
 
         state.outputFrame.ceil();
 
-        const { targetFrame, outputFrame } = state;
+        const { filterPasses, targetFrame, outputFrame } = state;
 
         let filterPassFrame = outputFrame;
         let renderable = true;
@@ -312,34 +324,38 @@ export class FilterSystem extends systems.FilterSystem
         {
             const filter = filters[i];
 
-            if (filter.measure)
+            filter.viewport = state.viewport;
+            filter.measure(targetFrame, filterPassFrame.clone(), padding);
+            const filterInput = filters[i].frame.fit(targetFrame);
+
+            if (filterInput.width <= 0 || filterInput.height <= 0)
             {
-                filter.viewport = state.viewport;
-                filter.measure(targetFrame, filterPassFrame.clone(), padding);
-                const pfilterPassFrame = filters[i].frame.fit(targetFrame);
-
-                if (pfilterPassFrame.width <= 0 || pfilterPassFrame.height <= 0)
+                if (!filtersMutable)
                 {
-                    if (!filtersMutable)
-                    {
-                        filters = state.filters.slice();
-                        state.filters = filters;
-                        filtersMutable = true;
-                    }
+                    filters = state.filters.slice();
+                    state.filters = filters;
+                    filtersMutable = true;
+                }
 
-                    filters.splice(i, 1);
-                }
-                else
-                {
-                    renderable = renderable && filter.renderable;
-                    pfilterPassFrame.ceil();
-                    filterPassFrame = pfilterPassFrame;
-                }
+                filters.splice(i, 1);
+            }
+            else
+            {
+                renderable = renderable && filter.renderable;
+                filterInput.ceil();
+
+                filterPasses.unshift(new FilterPass(
+                    filterInput.clone(),
+                    filterInput.clone(),
+                    filterPassFrame.clone(),
+                    filterPassFrame.clone(),
+                ));
+
+                filterPassFrame = filterInput;
             }
 
-            // filterPassFrame is the same
+        // filterPassFrame is the same
         }
-
         state.renderable = renderable;
 
         // filters may become empty if filters return empty rectangles as inputs.
@@ -407,9 +423,9 @@ export class FilterSystem extends systems.FilterSystem
     {
         const globalUniforms = this.globalUniforms.uniforms;
 
-        globalUniforms.inputFrame = filterPass.inputFrame;
+        globalUniforms.inputFrame.copyFrom(filterPass.inputFrame);
         //    globalUniforms.targetInFrame = filterPass.targetInFrame;
-        globalUniforms.outputFrame = filterPass.outputFrame;
+        globalUniforms.outputFrame.copyFrom(filterPass.outputFrame);
         //  globalUniforms.targetOutFrame = filterPass.targetOutFrame;
 
         this.globalUniforms.update();
@@ -451,8 +467,7 @@ export class FilterSystem extends systems.FilterSystem
         objectClamp[2] = (Math.ceil(inputFrame.width - inputFrame.right + state.nakedTargetBounds.right) - 0.5) * inputPixel[2];
         objectClamp[3] = (Math.ceil(inputFrame.height - inputFrame.bottom + state.nakedTargetBounds.bottom) - 0.5) * inputPixel[3];
 
-        globalUniforms.inputFrame = inputFrame;
-        globalUniforms.outputFrame = outputFrame;
+        this.updateUniforms(state.filterPasses[filterIndex]);
 
         inputFrameInverse[0] = 1 / inputFrame.width;
         inputFrameInverse[1] = 1 / inputFrame.height;

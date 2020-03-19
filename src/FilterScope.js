@@ -112,11 +112,35 @@ export class FilterScope
         this.filters = [];
 
         /**
+         * Pipeline of filter passes.
+         * @readonly
+         * @member {FilterPass[]}
+         */
+        this.filterPasses = [];
+
+        /**
+         * Filter pass index.
+         * @readonly
+         * @member {number}
+         */
+        this.currentIndex = 0;
+
+        /**
          * Viewport object for reading scal.
          * @member {PIXI.Viewport}
          * @readonly
          */
         this.viewport = defaultViewport;
+    }
+
+    get currentFilter()
+    {
+        return this.filters[this.currentIndex];
+    }
+
+    get currentFilterPass()
+    {
+        return this.filterPasses[this.currentIndex];
     }
 
     /**

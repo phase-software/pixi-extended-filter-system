@@ -4,9 +4,10 @@ import acsVertex from './acs.vert';
 import acsFragment from './acs.frag';
 
 /**
- * Special type of shader that applies a 2D filter on pixel in an input and
- * gives the required output. `Filter#measure` is used to determine the input
- * needed by this filter, given an output that the system demands.
+ * A filter applies a post-processing effect on an input texture.
+ *
+ * @class
+ * @extends PIXI.Filter
  */
 export class Filter extends BaseFilter
 {

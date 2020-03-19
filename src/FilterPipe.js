@@ -1,8 +1,6 @@
 import { SCALE_MODES } from 'pixi.js';
 
 /**
- * @namespace PIXI
- *
  * A filter-pipe can be used by composite filters to manage their multi-pass pipeline. It
  * automates setting input-/output- frames for each pass, saving & using intermediate
  * textures, allocating intermediate textures, and overriding some global uniforms.
@@ -13,6 +11,9 @@ import { SCALE_MODES } from 'pixi.js';
  *
  * A pipe is a reusable object. Its lifecycle is defined by the the `open` and `closeWith`
  * methods.
+ *
+ * @memberof PHX
+ * @class
  */
 export class FilterPipe
 {
@@ -80,7 +81,7 @@ export class FilterPipe
          * @readonly
          * @member {PIXI.Rectangle}
          */
-        this.bridgedFrame = filterManager.inputFrame;
+        this.bridgedFrame = filterManager.inputFrame.clone();
 
         /**
          * A copy of the final output-frame given by the filter-manager. The filter-manager's
@@ -88,7 +89,7 @@ export class FilterPipe
          * @readonly
          * @member {PIXI.Rectangle}
          */
-        this.endFrame = filterManager.outputFrame.clone();
+        this.endFrame = state.currentFilterPass.outputFrame;
 
         if (state.outputSwappable)
         {
