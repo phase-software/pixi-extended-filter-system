@@ -328,6 +328,12 @@ export class FilterPipe
             this.filterManager.returnFilterTexture(tex);
         }
 
+        if (this.bridgeTexture !== this.input && this.bridgeTexture !== this.output)
+        {
+            this.filterManager.returnFilterTexture(this.bridgeTexture);
+            this.bridgeTexture = null;
+        }
+
         this._bridgeTextures.length = 0;
 
         const closing = this.closingTexture;
