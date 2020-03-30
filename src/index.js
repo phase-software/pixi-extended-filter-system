@@ -18,6 +18,8 @@ export function injectEF(renderer)
     }
 
     renderer.filter = hppf;
+
+    return renderer;
 }
 
 export { CompositeFilter } from './CompositeFilter';

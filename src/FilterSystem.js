@@ -94,6 +94,8 @@ export class FilterSystem extends systems.FilterSystem
                 throw new Error('Cannot execute filters: too large texture size.');
             }
         }
+
+        //  this.activeState = state;
     }
 
     pop()
@@ -166,6 +168,7 @@ export class FilterSystem extends systems.FilterSystem
                         }
                         else
                         {
+                            // ++state.currentIndex;
                             continue;// no need to flip-flop since input already was made the output
                         }
                     }

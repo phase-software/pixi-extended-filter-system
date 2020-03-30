@@ -164,9 +164,9 @@ export class FilterPipe
      */
     bridge(filter, nextFrame = this.bridgedFrame, renderOptions)
     {
-        const inputWritableHere = this.inputWritable || this.bridgeTexture !== this.input;
+        const inputWritableHere = !this.saveTexture && (this.inputWritable || this.bridgeTexture !== this.input);
 
-        this.state.inputWritable = !this.saveTexture && inputWritableHere;
+        this.state.inputWritable = inputWritableHere;
 
         const nextTexture = this.getBridgeTexture(nextFrame);
 
@@ -232,7 +232,9 @@ export class FilterPipe
      */
     closeWith(filter, renderOptions, noFinalize = false)
     {
-        this.state.inputWritable = !this.saveTexture && this.inputWritable ? true : this.bridgeTexture !== this.input;
+        const inputWritableHere = !this.saveTexture && (this.inputWritable || this.bridgeTexture !== this.input);
+
+        this.state.inputWritable = inputWritableHere;
 
         this.filterManager.outputFrame.copyFrom(this.endFrame);
         this.autoRun();
@@ -246,8 +248,14 @@ export class FilterPipe
             this._savedTextures.push(this.bridgeTexture);
             this.saveTexture = false;
         }
+        else if (closingTextureOverride !== this.bridgeTexture && inputWritableHere)
+        {
+            this.returnBridgeTexture(this.bridgeTexture);
+        }
 
-        if (closingTextureOverride)
+        this.bridgeTexture = null;
+
+        if (closingTextureOverride && closingTextureOverride !== this._closingTexture)
         {
             this.overrideClosingTexture(closingTextureOverride);
         }
@@ -328,9 +336,9 @@ export class FilterPipe
             this.filterManager.returnFilterTexture(tex);
         }
 
-        if (this.bridgeTexture !== this.input && this.bridgeTexture !== this.output)
+        if (this.bridgeTexture && this.bridgeTexture !== this.input && this.bridgeTexture !== this.output)
         {
-            this.filterManager.returnFilterTexture(this.bridgeTexture);
+            //  this.filterManager.returnFilterTexture(this.bridgeTexture);
             this.bridgeTexture = null;
         }
 
@@ -452,6 +460,11 @@ export class FilterPipe
      */
     overrideClosingTexture(tex)
     {
+        if (this._closingTexture && (tex !== this.output || this.state.outputSwappable))
+        {
+            this.returnBridgeTexture(this._closingTexture);
+        }
+
         this._closingTexture = tex;
     }
 }
