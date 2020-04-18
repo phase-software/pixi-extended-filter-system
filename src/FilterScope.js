@@ -78,6 +78,8 @@ export class FilterScope
          */
         this.targetFrame = null;
 
+        this.padding = 0;
+
         /**
          * Frame in which pixels are to be calculated for rendering onto the
          * final renderTexture/screen.

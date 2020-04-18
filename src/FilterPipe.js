@@ -196,7 +196,9 @@ export class FilterPipe
             this.bridgeTexture = nextOverride;
 
             if (nextOverride !== nextTexture)
-            { this.returnBridgeTexture(nextTexture); }
+            {
+                this.returnBridgeTexture(nextTexture);
+            }
         }
         else
         {

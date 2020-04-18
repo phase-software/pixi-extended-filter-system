@@ -130,7 +130,13 @@ export class FilterSystem extends systems.FilterSystem
 
             const lastState = filterStack[filterStack.length - 1];
 
-            if (filters.length === 1)
+            if (filters.length > 0 && state.target.layeredFilterManager
+                && state.target.layeredFilterManager.requiresLayers())
+            {
+                state.target.layeredFilterManager.applyScope(this);
+                this.returnFilterTexture(state.renderTexture);
+            }
+            else if (filters.length === 1)
             {
                 this.passUniforms(state, 0);
                 filters[0].apply(this, state.renderTexture, lastState.renderTexture, false, state);
@@ -274,24 +280,28 @@ export class FilterSystem extends systems.FilterSystem
 
         let legacy = filters[0].legacy;
 
+        filters[0].viewport = state.viewport;
+
         let padding = filters[0].padding;
 
         for (let i = 1; i < filters.length; i++)
         {
             const filter =  filters[i];
 
+            filter.viewport = state.viewport;
+
             resolution = Math.min(resolution, filter.resolution);
             autoFit = autoFit && filter.autoFit;
             legacy = legacy || filter.legacy;
 
-            if (!filter.additivePadding)
-            {
-                padding = Math.max(padding, filter.padding);
-            }
-            else
-            {
-                padding += filter.padding;
-            }
+            //    if (!filter.additivePadding)
+            //    {
+            padding = Math.max(padding, filter.padding);
+            //    }
+            //    else
+            //    {
+            //        padding += filter.padding;
+            //    }
         }
 
         // target- & output- frame measuring pass
@@ -315,7 +325,7 @@ export class FilterSystem extends systems.FilterSystem
             state.targetFrame = state.outputFrame;
         }
 
-        state.outputFrame.ceil();
+        //        state.outputFrame.ceil();
 
         const { filterPasses, targetFrame, outputFrame } = state;
 
@@ -362,7 +372,13 @@ export class FilterSystem extends systems.FilterSystem
         state.renderable = renderable;
 
         // filters may become empty if filters return empty rectangles as inputs.
-        state.inputFrame = filters[0] && filters[0].frame ? filters[0].frame : outputFrame;
+
+        if (!state.inputFrame)
+        {
+            state.inputFrame = new Rectangle();
+        }
+
+        state.inputFrame.copyFrom(filters[0] && filters[0].frame ? filters[0].frame : outputFrame);
     }
 
     /**

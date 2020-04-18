@@ -24,7 +24,7 @@ export function injectEF(renderer)
 
 export { CompositeFilter } from './CompositeFilter';
 export { Filter, Filter as default } from './Filter';
-export { FilterPipe } from './FilterPipe';
-export { FilterScope } from './FilterScope';
+export * from './FilterPipe';
+export * from './FilterScope';
 export { FILTER_RECTS } from './FilterRects';
-export { FilterPass } from './FilterPass';
+export * from './FilterPass';
