@@ -131,6 +131,7 @@ export class FilterSystem extends systems.FilterSystem
             const lastState = filterStack[filterStack.length - 1];
 
             if (filters.length > 0 && state.target.layeredFilterManager
+                && !state.target.layeredFilterLifecycle._renderLock
                 && state.target.layeredFilterManager.requiresLayers())
             {
                 state.target.layeredFilterManager.applyScope(this);
@@ -212,7 +213,9 @@ export class FilterSystem extends systems.FilterSystem
         return this.globalUniforms.uniforms.outputFrame;
     }
 
-    /** @override */
+    /**
+     * @override
+     */
     applyFilter(filter, input, output, clear, options = this.resolveRenderOptions(filter.renderOptions, this.activeState))
     {
         const renderer = this.renderer;
@@ -261,11 +264,10 @@ export class FilterSystem extends systems.FilterSystem
     }
 
     /**
-     * Measures all the frames needed in the given pipe. This includes
-     * the target, input, output, and each filter's frame.
+     * Measures all the frames needed in the given pipe. This includes the target, input, output, and each filter's
+     * frame.
      *
-     * NOTE: `measure` also calculates `resolution`, `padding`,
-     *  and `legacy` of the pipe.
+     * NOTE: `measure` also calculates `resolution`, `padding`, and `legacy` of the pipe.
      *
      * @param {FilterScope} state
      */
