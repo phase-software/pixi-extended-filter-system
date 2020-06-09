@@ -143,7 +143,7 @@ export class FilterScope
          */
         this.rendererSnapshot = {
             sourceFrame: new Rectangle(),
-            destinationFrame: new Rectangle()
+            destinationFrame: new Rectangle(),
         };
     }
 
@@ -224,7 +224,7 @@ export class FilterScope
         this.target = null;
         this.filters = null;
         this.renderTexture = null;
-        this.resolution = 0;
+        this.resolution = 1;
         this.viewport = defaultViewport;
         this._nakedTargetBounds = null;
         this._nakedSourceFrame = null;

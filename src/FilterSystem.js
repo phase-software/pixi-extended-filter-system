@@ -37,6 +37,8 @@ export class FilterSystem extends systems.FilterSystem
 
         this.identityFilter = new Filter();
         this.rescaleFilter = new RescaleFilter();
+
+        this.defaultFilterStack[0] = new FilterPipe();
     }
 
     /**
@@ -97,8 +99,14 @@ export class FilterSystem extends systems.FilterSystem
 
             state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
 
-            renderer.renderTexture.bind(state.renderTexture, state.inputFrame,
-                new Rectangle(0, 0, state.inputFrame.width, state.inputFrame.height));
+            state.renderTexture.setResolution(1);
+
+            renderer.renderTexture.bind(state.renderTexture,
+                state.inputFrame,
+                new Rectangle(0, 0, state.inputFrame.width * state.resolution, state.inputFrame.height * state.resolution));
+
+            state.renderTexture.setResolution(state.resolution);
+
             renderer.renderTexture.clear();
 
             const limit = renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE);
@@ -148,7 +156,6 @@ export class FilterSystem extends systems.FilterSystem
                 && !state.target.layeredFilterLifecycle._renderLock
                 && state.target.layeredFilterManager.requiresLayers())
             {
-                console.log('he');
                 state.target.layeredFilterManager.applyScope(this);
                 this.returnFilterTexture(state.renderTexture);
             }
@@ -249,11 +256,15 @@ export class FilterSystem extends systems.FilterSystem
         else
         {
             const defaultDestinationFrame = output && output.filterFrame
-                ? new Rectangle(0, 0, output.filterFrame.width, output.filterFrame.height)
-                : null;
+                ? new Rectangle(
+                    0,
+                    0,
+                    output.filterFrame.width * this.activeState.resolution, output.filterFrame.height * this.activeState.resolution)
+                : new Rectangle(0, 0, this.outputFrame.width, this.outputFrame.height);
 
             renderer.renderTexture.bind(output,
-                output ? output.filterFrame : null, options.destinationFrame || (output && output.destinationFrame) || defaultDestinationFrame);
+                output ? output.filterFrame : null,
+                options.destinationFrame || (output && output.destinationFrame) || defaultDestinationFrame);
         }
 
         if (clear && options.destinationFrame)
