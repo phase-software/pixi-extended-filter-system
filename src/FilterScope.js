@@ -133,6 +133,18 @@ export class FilterScope
          * @readonly
          */
         this.viewport = defaultViewport;
+
+        /**
+         * This is copy of the renderer's state before filtering.
+         *
+         * @member {object}
+         * @property {Rectangle} sourceFrame
+         * @property {Rectangle} destinationFrame
+         */
+        this.rendererSnapshot = {
+            sourceFrame: new Rectangle(),
+            destinationFrame: new Rectangle()
+        };
     }
 
     get currentFilter()

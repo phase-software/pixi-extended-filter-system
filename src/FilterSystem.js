@@ -5,6 +5,9 @@ import FilterRects from './FilterRects';
 import { RescaleFilter } from './filter-rescale';
 import { FilterPass } from './FilterPass';
 
+/** @typedef {import('./Filter').Filter} Filter */
+/** @typedef {import('./FilterPass').FilterPass} FilterPass */
+
 const GEOMETRY_INDICES = [0, 1, 3, 2];
 
 /**
@@ -75,6 +78,17 @@ export class FilterSystem extends systems.FilterSystem
             state.resolution = options.resolution;
         }
 
+        const res = renderer.renderTexture.current ? renderer.renderTexture.current.baseTexture.resolution : renderer.resolution;
+
+        state.rendererSnapshot.sourceFrame.copyFrom(renderer.renderTexture.sourceFrame);
+        state.rendererSnapshot.destinationFrame.copyFrom(renderer.renderTexture.destinationFrame);
+
+        //*
+        state.rendererSnapshot.destinationFrame.x *= res;
+        state.rendererSnapshot.destinationFrame.y *= res;
+        state.rendererSnapshot.destinationFrame.width *= res;
+        state.rendererSnapshot.destinationFrame.height *= res; // */
+
         if (state.filters.length > 0)
         {
             state.renderTexture = this.filterPassRenderTextureFor(state);
@@ -134,14 +148,18 @@ export class FilterSystem extends systems.FilterSystem
                 && !state.target.layeredFilterLifecycle._renderLock
                 && state.target.layeredFilterManager.requiresLayers())
             {
+                console.log('he');
                 state.target.layeredFilterManager.applyScope(this);
                 this.returnFilterTexture(state.renderTexture);
             }
             else if (filters.length === 1)
             {
                 this.passUniforms(state, 0);
+                state.restoreSnapshot = lastState.renderTexture;
+
                 filters[0].apply(this, state.renderTexture, lastState.renderTexture, false, state);
 
+                state.restoreSnapshot = false;
                 this.returnFilterTexture(state.renderTexture);
             }
             else
@@ -191,9 +209,11 @@ export class FilterSystem extends systems.FilterSystem
                 this.passUniforms(state, filters.length - 1);
                 state.outputSwappable = false;
                 state.inputWritable = true;
+                state.restoreSnapshot = lastState.renderTexture;
 
                 filters[i].apply(this, flip, lastState.renderTexture, false, state);
 
+                state.restoreSnapshot = false;
                 this.returnFilterTexture(flip);
                 this.returnFilterTexture(flop);
             }
@@ -220,8 +240,21 @@ export class FilterSystem extends systems.FilterSystem
     {
         const renderer = this.renderer;
 
-        renderer.renderTexture.bind(output,
-            output ? output.filterFrame : null, options.destinationFrame || (output && output.destinationFrame));
+        if (this.activeState.restoreSnapshot === output)
+        {
+            renderer.renderTexture.bind(output,
+                this.activeState.rendererSnapshot.sourceFrame,
+                this.activeState.rendererSnapshot.destinationFrame);
+        }
+        else
+        {
+            const defaultDestinationFrame = output && output.filterFrame
+                ? new Rectangle(0, 0, output.filterFrame.width, output.filterFrame.height)
+                : null;
+
+            renderer.renderTexture.bind(output,
+                output ? output.filterFrame : null, options.destinationFrame || (output && output.destinationFrame) || defaultDestinationFrame);
+        }
 
         if (clear && options.destinationFrame)
         {

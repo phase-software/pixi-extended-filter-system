@@ -157,7 +157,8 @@ export class Filter extends BaseFilter
 
     get viewportScale()
     {
-        return this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1;
+        // TRANSITION: Projection-matrix viewport
+        return 1; // this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1;
     }
 
     apply(filterManager, input, output, clear, state, renderOptions)
