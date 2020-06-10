@@ -4,6 +4,7 @@ import { FilterScope as FilterPipe } from './FilterScope';
 import FilterRects from './FilterRects';
 import { RescaleFilter } from './filter-rescale';
 import { FilterPass } from './FilterPass';
+import { nextPow2 } from '@pixi/utils';
 
 /** @typedef {import('./Filter').Filter} Filter */
 /** @typedef {import('./FilterPass').FilterPass} FilterPass */
@@ -75,38 +76,30 @@ export class FilterSystem extends systems.FilterSystem
         {
             state.padding = Math.max(options.padding, state.padding);
         }
+
         if (options.resolution)
         {
             state.resolution = options.resolution;
         }
-
-        const res = renderer.renderTexture.current ? renderer.renderTexture.current.baseTexture.resolution : renderer.resolution;
+        else if (options.viewport)
+        {
+        //    state.resolution = nextPow2(options.viewport.scale.x);
+        }
 
         state.rendererSnapshot.sourceFrame.copyFrom(renderer.renderTexture.sourceFrame);
         state.rendererSnapshot.destinationFrame.copyFrom(renderer.renderTexture.destinationFrame);
-
-        //*
-        state.rendererSnapshot.destinationFrame.x *= res;
-        state.rendererSnapshot.destinationFrame.y *= res;
-        state.rendererSnapshot.destinationFrame.width *= res;
-        state.rendererSnapshot.destinationFrame.height *= res; // */
 
         if (state.filters.length > 0)
         {
             state.renderTexture = this.filterPassRenderTextureFor(state);
             state.textureDimensions.set(state.renderTexture.width, state.renderTexture.height);
             state.texturePixels.copyFrom(state.textureDimensions);
+            state.texturePixels.x *= state.resolution;
+            state.texturePixels.y *= state.resolution;
 
             state.renderTexture.filterFrame = state.inputFrame.clone().ceil(1);
 
-            state.renderTexture.setResolution(1);
-
-            renderer.renderTexture.bind(state.renderTexture,
-                state.inputFrame,
-                new Rectangle(0, 0, state.inputFrame.width * state.resolution, state.inputFrame.height * state.resolution));
-
-            state.renderTexture.setResolution(state.resolution);
-
+            renderer.renderTexture.bind(state.renderTexture, state.inputFrame);
             renderer.renderTexture.clear();
 
             const limit = renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE);
@@ -259,7 +252,7 @@ export class FilterSystem extends systems.FilterSystem
                 ? new Rectangle(
                     0,
                     0,
-                    output.filterFrame.width * this.activeState.resolution, output.filterFrame.height * this.activeState.resolution)
+                    output.filterFrame.width, output.filterFrame.height)
                 : new Rectangle(0, 0, this.outputFrame.width, this.outputFrame.height);
 
             renderer.renderTexture.bind(output,
@@ -320,7 +313,7 @@ export class FilterSystem extends systems.FilterSystem
         const { target } = state;
         let { filters } = state;
 
-        let resolution = filters[0].resolution;
+        const resolution = filters[0].resolution;
 
         let autoFit = filters[0].autoFit;
 
@@ -335,8 +328,8 @@ export class FilterSystem extends systems.FilterSystem
             const filter =  filters[i];
 
             filter.viewport = state.viewport;
+            filter.resolution = state.resolution;
 
-            resolution = Math.min(resolution, filter.resolution);
             autoFit = autoFit && filter.autoFit;
             legacy = legacy || filter.legacy;
 
@@ -350,8 +343,6 @@ export class FilterSystem extends systems.FilterSystem
             //    }
         }
 
-        // target- & output- frame measuring pass
-        state.resolution = resolution;
         state.legacy = legacy;
         state.target = target;
         state.padding = padding;
@@ -383,7 +374,7 @@ export class FilterSystem extends systems.FilterSystem
         {
             const filter = filters[i];
 
-            filter.viewport = state.viewport;
+            filter.viewport = { scale: state.target.scale };
             filter.measure(targetFrame, filterPassFrame.clone(), padding);
             const filterInput = filters[i].frame.fit(targetFrame);
 
