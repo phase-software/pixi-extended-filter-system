@@ -79,6 +79,12 @@ export class FilterSystem extends systems.FilterSystem
         {
             state.resolution = this.renderer.renderTexture.current.baseTexture.resolution;
         }
+        else
+        {
+            const { destinationFrame, sourceFrame } = this.renderer.projection;
+
+            state.resolution = nextPow2(Math.max(Math.min(destinationFrame.width / sourceFrame.width, 16), 1));
+        }
 
         state.rendererSnapshot.sourceFrame.copyFrom(renderer.renderTexture.sourceFrame);
         state.rendererSnapshot.destinationFrame.copyFrom(renderer.renderTexture.destinationFrame);
@@ -317,19 +323,11 @@ export class FilterSystem extends systems.FilterSystem
         {
             const filter =  filters[i];
 
-            filter.resolution = state.resolution;
-
             autoFit = autoFit && filter.autoFit;
             legacy = legacy || filter.legacy;
-
-            //    if (!filter.additivePadding)
-            //    {
             padding = Math.max(padding, filter.padding);
-            //    }
-            //    else
-            //    {
-            //        padding += filter.padding;
-            //    }
+
+            filter.resolution = state.resolution;
         }
 
         state.legacy = legacy;
@@ -433,9 +431,7 @@ export class FilterSystem extends systems.FilterSystem
     filterPassRenderTextureFor(state)
     {
         let width = 0;
-
         let height = 0;
-
         let defaultIncluded = false;
 
         for (let i = 0; i < state.filters.length; i++)

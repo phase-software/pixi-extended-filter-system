@@ -402,7 +402,7 @@ export class FilterPipe
         }
         else
         {
-            bridgeTexture = this.filterManager.getFilterTexture(this.input);
+            bridgeTexture = this.filterManager.getFilterTexture(this.input, this.state.resolution);
         }
 
         bridgeTexture.filterFrame = frame;// this will be set when used!
