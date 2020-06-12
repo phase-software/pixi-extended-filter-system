@@ -17,18 +17,11 @@ export class Filter extends BaseFilter
         super(vertex, fragment, uniforms);
 
         this.additivePadding = false;
-
         this.nestedFilters = [];
-
         this.parentFilter = null;// are you just a filter-pass for another fitler?
-
         this.padding = undefined;
 
-        /**
-         * Render options that work when applying this filter.
-         *
-         * @member {PIXI.RenderOptions}
-         */
+        /** @todo This might be eliminated from the code fully. */
         this.renderOptions = {};
     }
 
@@ -39,9 +32,7 @@ export class Filter extends BaseFilter
      * @abstract
      *
      * Create a <code>defaultPadding</code> property if your filter has an instrinsic need
-     * for one. The padding can be overridden by the client. The default padding
-     * should return the padding needed when viewport scale is 1 (it should not
-     * consider viewport in its calculation)
+     * for one. The padding can be overridden by the client.
      */
 
     /**
@@ -57,7 +48,7 @@ export class Filter extends BaseFilter
 
     get padding()
     {
-        let normalPadding;// padding when viewport scale is 1
+        let normalPadding;
 
         if (this._paddingOverride !== undefined)
         {
@@ -72,7 +63,7 @@ export class Filter extends BaseFilter
             normalPadding = 0;
         }
 
-        let padding = normalPadding * this.viewportScale;
+        let padding = normalPadding;
 
         for (const filter of this.nestedFilters)
         {
@@ -155,10 +146,17 @@ export class Filter extends BaseFilter
         return this._renderable;
     }
 
+    /** @deprecated */
+    get viewport()
+    {
+        throw new Error('viewport is deprecated');
+    }
+
+    /** @deprcated */
     get viewportScale()
     {
         // TRANSITION: Projection-matrix viewport
-        return this.viewport ? Math.max(this.viewport.scale.x, this.viewport.scale.y) : 1;
+        throw new Error('viewportScale should not be used now.');
     }
 
     apply(filterManager, input, output, clear, state, renderOptions)

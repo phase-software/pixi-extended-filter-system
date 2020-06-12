@@ -1,11 +1,5 @@
 import { Point, Rectangle } from 'pixi.js';
 
-const defaultScale = new Point(1, 1);
-
-const defaultViewport = {
-    scale: defaultScale,
-};
-
 /**
  * Stateful object for handling filters of a specific display object.
  *
@@ -128,13 +122,6 @@ export class FilterScope
         this.currentIndex = 0;
 
         /**
-         * Viewport object for reading scal.
-         * @member {PIXI.Viewport}
-         * @readonly
-         */
-        this.viewport = defaultViewport;
-
-        /**
          * This is copy of the renderer's state before filtering.
          *
          * @member {object}
@@ -211,8 +198,8 @@ export class FilterScope
 
     normalize(ivec, ovec)
     {
-        ovec.x = ivec.x * this.viewport.scale.x / this.texturePixels.x;
-        ovec.y = ivec.y * this.viewport.scale.y / this.texturePixels.y;
+        ovec.x = ivec.x * this.resolution / this.texturePixels.x;
+        ovec.y = ivec.y * this.resolution / this.texturePixels.y;
     }
 
     /**
@@ -225,7 +212,6 @@ export class FilterScope
         this.filters = null;
         this.renderTexture = null;
         this.resolution = 1;
-        this.viewport = defaultViewport;
         this._nakedTargetBounds = null;
         this._nakedSourceFrame = null;
 
