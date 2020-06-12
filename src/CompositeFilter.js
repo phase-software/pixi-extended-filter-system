@@ -20,7 +20,7 @@ export class CompositeFilter extends Filter
 
     /**
      * Keep the given filter as a nested filter. This will bind the padding
-     * & viewport properties of this filter to the nested filter.
+     * & other properties of this filter to the nested filter.
      *
      * @param {PIXI.Filter} filter
      * @param {boolean}[noBind=false] - prevents uniform binding from parent to child
@@ -30,7 +30,6 @@ export class CompositeFilter extends Filter
     keep(filter, noBind = false)
     {
         filter.parentFilter = this;
-        filter.viewport = this.viewport;
         filter.uniforms.binding = noBind ? null : this.uniformGroup;
 
         this.nestedFilters.push(filter);
@@ -52,20 +51,6 @@ export class CompositeFilter extends Filter
             filter.uniforms.binding = null;
             filter.parentFilter = null;
             this.nestedFilters.splice(index, 1);
-        }
-    }
-
-    get viewport()
-    {
-        return this._viewport;
-    }
-    set viewport(value)
-    {
-        this._viewport = value;
-
-        for (const filter of this.nestedFilters)
-        {
-            filter.viewport = value;
         }
     }
 }

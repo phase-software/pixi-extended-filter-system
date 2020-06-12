@@ -64,12 +64,6 @@ export class FilterSystem extends systems.FilterSystem
         }
 
         filterStack.push(state);
-
-        if (options.viewport)
-        {
-            state.viewport = options.viewport;
-        }
-
         this.measure(state);
 
         if (options.padding)
@@ -81,9 +75,15 @@ export class FilterSystem extends systems.FilterSystem
         {
             state.resolution = options.resolution;
         }
-        else if (options.viewport)
+        else if (this.renderer.renderTexture.current)
         {
-        //    state.resolution = nextPow2(options.viewport.scale.x);
+            state.resolution = this.renderer.renderTexture.current.baseTexture.resolution;
+        }
+        else
+        {
+            const { destinationFrame, sourceFrame } = this.renderer.projection;
+
+            state.resolution = nextPow2(Math.max(Math.min(destinationFrame.width / sourceFrame.width, 16), 1));
         }
 
         state.rendererSnapshot.sourceFrame.copyFrom(renderer.renderTexture.sourceFrame);
@@ -267,7 +267,7 @@ export class FilterSystem extends systems.FilterSystem
 
             gl.enable(gl.SCISSOR_TEST);
             gl.scissor(x, y, width, height);
-            renderer.renderTexture.clear([Math.random(), Math.random(), Math.random(), 1]);
+            renderer.renderTexture.clear();
             renderer.scissor.pop();
         }
         else if (clear)
@@ -316,31 +316,18 @@ export class FilterSystem extends systems.FilterSystem
         const resolution = filters[0].resolution;
 
         let autoFit = filters[0].autoFit;
-
         let legacy = filters[0].legacy;
-
-        filters[0].viewport = state.viewport;
-
         let padding = filters[0].padding;
 
         for (let i = 1; i < filters.length; i++)
         {
             const filter =  filters[i];
 
-            filter.viewport = state.viewport;
-            filter.resolution = state.resolution;
-
             autoFit = autoFit && filter.autoFit;
             legacy = legacy || filter.legacy;
-
-            //    if (!filter.additivePadding)
-            //    {
             padding = Math.max(padding, filter.padding);
-            //    }
-            //    else
-            //    {
-            //        padding += filter.padding;
-            //    }
+
+            filter.resolution = state.resolution;
         }
 
         state.legacy = legacy;
@@ -374,7 +361,6 @@ export class FilterSystem extends systems.FilterSystem
         {
             const filter = filters[i];
 
-            filter.viewport = { scale: state.target.scale };
             filter.measure(targetFrame, filterPassFrame.clone(), padding);
             const filterInput = filters[i].frame.fit(targetFrame);
 
@@ -433,11 +419,6 @@ export class FilterSystem extends systems.FilterSystem
     {
         const pipe = this._newPipe(target, filters);
 
-        if (options)
-        {
-            pipe.viewport = options.viewport;
-        }
-
         this.measure(pipe);
 
         return pipe;
@@ -450,9 +431,7 @@ export class FilterSystem extends systems.FilterSystem
     filterPassRenderTextureFor(state)
     {
         let width = 0;
-
         let height = 0;
-
         let defaultIncluded = false;
 
         for (let i = 0; i < state.filters.length; i++)
@@ -666,5 +645,4 @@ FilterSystem.geometryPool = [];
  * @namespace PIXI
  * @property {number} padding - atleast this much padding will be provided
  * @property {number} resolution - override resolution for filters
- * @property {PIXI.Viewport} viewport - viewport provided to filters
  */
