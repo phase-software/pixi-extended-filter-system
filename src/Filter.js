@@ -149,14 +149,16 @@ export class Filter extends BaseFilter
     /** @deprecated */
     get viewport()
     {
-        throw new Error('viewport is deprecated');
+        // throw new Error('viewport is deprecated');
     }
+    set viewport(_) {}
 
     /** @deprcated */
     get viewportScale()
     {
         // TRANSITION: Projection-matrix viewport
-        throw new Error('viewportScale should not be used now.');
+        // throw new Error('viewportScale should not be used now.');
+        return 1;
     }
 
     apply(filterManager, input, output, clear, state, renderOptions)

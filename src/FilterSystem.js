@@ -145,6 +145,8 @@ export class FilterSystem extends systems.FilterSystem
 
             const lastState = filterStack[filterStack.length - 1];
 
+            state.restoreSnapshot = lastState.renderTexture;
+
             if (filters.length > 0 && state.target.layeredFilterManager
                 && !state.target.layeredFilterLifecycle._renderLock
                 && state.target.layeredFilterManager.requiresLayers())
@@ -155,7 +157,6 @@ export class FilterSystem extends systems.FilterSystem
             else if (filters.length === 1)
             {
                 this.passUniforms(state, 0);
-                state.restoreSnapshot = lastState.renderTexture;
 
                 filters[0].apply(this, state.renderTexture, lastState.renderTexture, false, state);
 
@@ -209,7 +210,6 @@ export class FilterSystem extends systems.FilterSystem
                 this.passUniforms(state, filters.length - 1);
                 state.outputSwappable = false;
                 state.inputWritable = true;
-                state.restoreSnapshot = lastState.renderTexture;
 
                 filters[i].apply(this, flip, lastState.renderTexture, false, state);
 
