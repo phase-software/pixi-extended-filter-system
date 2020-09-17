@@ -264,9 +264,12 @@ export class FilterSystem extends systems.FilterSystem
         {
             const gl = this.renderer.gl;
             const { x, y, width, height } = options.destinationFrame;
+            const r = this.renderer.renderTexture.current ?
+              this.renderer.renderTexture.current :
+              this.renderer.resolution
 
             gl.enable(gl.SCISSOR_TEST);
-            gl.scissor(x, y, width, height);
+            gl.scissor(x*r, y*r, width*r, height*r);
             renderer.renderTexture.clear();
             renderer.scissor.pop();
         }
