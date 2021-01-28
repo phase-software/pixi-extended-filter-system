@@ -17,7 +17,7 @@
     "babel-eslint": "^10.0.3",
     "canvas": "^2.6.1",
     "chai": "^4.2.0",
-    "electron": "^8.2.0",
+    "electron": "^9.4.0",
     "eslint": "^6.8.0",
     "esm": "^3.2.25",
     "floss": "^3.0.0",
