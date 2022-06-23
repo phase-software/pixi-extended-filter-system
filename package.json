@@ -21,7 +21,7 @@
     "eslint": "^6.8.0",
     "esm": "^3.2.25",
     "floss": "^3.0.0",
-    "jsdom": "^16.2.1",
+    "jsdom": "^16.5.0",
     "jsdom-global": "^3.0.2",
     "mocha": "^7.1.1",
     "node-canvas-webgl": "^0.2.6",
